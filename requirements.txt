@@ -1,0 +1,6 @@
+numpy
+torch
+scipy
+matplotlib      # plotting
+h5py            # Data file format
+jupyter         # notebook support
