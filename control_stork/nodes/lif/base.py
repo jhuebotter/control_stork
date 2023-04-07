@@ -59,6 +59,8 @@ class LIFGroup(CellGroup):
         )
         self.tau_mem = tau_mem
         self.tau_syn = tau_syn
+        print('Activation: ', activation)
+        print('Activation.apply: ', activation.apply)
         self.spk_nl = activation.apply
         self.diff_reset = diff_reset
         self.learn_timescales = learn_timescales
