@@ -59,7 +59,7 @@ class LIFGroup(CellGroup):
         )
         self.tau_mem = tau_mem
         self.tau_syn = tau_syn
-        self.spk_nl = activation
+        self.spk_nl = activation.apply
         self.diff_reset = diff_reset
         self.learn_timescales = learn_timescales
         self.clamp_mem = clamp_mem
@@ -97,8 +97,8 @@ class LIFGroup(CellGroup):
 
     def get_spike_and_reset(self, mem):
         mthr = mem - 1.0
-        out = self.spk_nl(mthr)
 
+        out = self.spk_nl(mthr)
         if self.diff_reset:
             rst = out
         else:

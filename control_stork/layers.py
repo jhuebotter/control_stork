@@ -103,10 +103,12 @@ class Layer(AbstractLayer):
         regs=None,
         w_regs=None,
         connection_class=connections.Connection,
+        recurrent_connection_class=None,
         neuron_class=nodes.LIFGroup,
         flatten_input_layer=True,
         neuron_kwargs={},
         connection_kwargs={},
+        recurrent_connection_kwargs=None,
     ) -> None:
 
         super().__init__(name, model, recurrent)
@@ -127,8 +129,12 @@ class Layer(AbstractLayer):
 
         # Make recurrent connection
         if recurrent:
-            con = connection_class(
-                nodes, nodes, regularizers=w_regs, **connection_kwargs
+            if recurrent_connection_class is None:
+                recurrent_connection_class = connection_class
+            if recurrent_connection_kwargs is None:
+                recurrent_connection_kwargs = connection_kwargs
+            con = recurrent_connection_class(
+                nodes, nodes, regularizers=w_regs, **recurrent_connection_kwargs
             )
             self.add_connection(con)
 
