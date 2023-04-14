@@ -42,6 +42,8 @@ class SpikeMonitor(Monitor):
         self.data.append(self.group.states['out'].detach())
 
     def get_data(self) -> torch.Tensor:
+        if not self.data:
+            return None
         out = torch.stack(self.data, dim=1).cpu()
         tmp = torch.nonzero(out)
         tmp[:, 0] += self.batch_count_
@@ -75,7 +77,36 @@ class StateMonitor(Monitor):
             self.data.append(self.group.states[self.key].detach())
 
     def get_data(self) -> torch.Tensor:
+        if not self.data:
+            return None
         return torch.stack(self.data, dim=1).cpu()
+    
+
+class PlotStateMonitor(StateMonitor):
+    """Records the state of a neuron group over time and plots it
+
+    Args:
+        group: The group to record from
+        key: The name of the state
+    """
+
+    def __init__(
+        self,
+        group: CellGroup,
+        key: str,
+        subset: Optional[Union[int, Iterable]] = None,
+        plot_fn: Optional[Callable] = None,
+        **kwargs
+    ) -> None:
+        super().__init__(group, key, subset)
+        self.plot_fn = plot_fn
+        self.kwargs = kwargs
+
+    def get_data(self) -> 'matplotlib.figure.Figure':
+        data = super().get_data()
+        if data is None:
+            return None
+        return self.plot_fn(data, **self.kwargs)
 
 
 class SpikeCountMonitor(Monitor):
@@ -103,6 +134,8 @@ class SpikeCountMonitor(Monitor):
             self.data += spk
 
     def get_data(self) -> torch.Tensor:
+        if self.data is None:
+            return None
         return self.data.cpu()
 
 class PopulationSpikeCountMonitor(Monitor):
@@ -110,6 +143,7 @@ class PopulationSpikeCountMonitor(Monitor):
 
     Args:
         group: The group to record from
+        per_example: If True, returns the mean spike count per example
 
     Returns:
         A tensor with spike counts for each input and neuron
@@ -127,6 +161,8 @@ class PopulationSpikeCountMonitor(Monitor):
         self.data.append(self.group.states['out'].detach())
 
     def get_data(self) -> torch.Tensor:
+        if not self.data:
+            return None
         s1 = torch.sum(torch.stack(self.data, dim=1), dim=1).cpu()
         return torch.mean(s1, dim=1) if self.per_example else torch.mean(s1)
 
@@ -152,6 +188,8 @@ class PopulationFiringRateMonitor(Monitor):
         self.data.append(self.group.states['out'].detach())
 
     def get_data(self) -> torch.Tensor:
+        if not self.data:
+            return None
         s1 = torch.stack(self.data, dim=1).cpu()
         s1 = s1.reshape(s1.shape[0], s1.shape[1], self.group.nb_units)
         return torch.sum(s1, dim=-1) / self.group.nb_units
@@ -162,7 +200,7 @@ class MeanVarianceMonitor(Monitor):
 
     Args:
         group: The group to record from
-        state (string): State variable to monitor (Monitors mean and variance of a state variable)
+        key (string): State variable to monitor (Monitors mean and variance of a state variable)
 
 
     Returns:

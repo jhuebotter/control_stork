@@ -125,6 +125,17 @@ class RecurrentSpikingModel(nn.Module):
         for m in self.monitors:
             m.execute()
 
+    def get_monitor_data(self) -> dict:
+        data = {}
+        for m in self.monitors:
+            k = f'{m.__class__.__name__}'
+            if hasattr(m, 'group'):
+                k += f' on {m.group.name}'
+            if hasattr(m, 'key'):
+                k += f' for {m.key}'
+            data[k] = m.get_data()
+        return data
+    
     def compute_regularizer_losses(self):
         reg_loss = torch.zeros(1, device=self.device)
         for g in self.groups:
