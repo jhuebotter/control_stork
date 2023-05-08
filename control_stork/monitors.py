@@ -207,10 +207,11 @@ class MeanVarianceMonitor(Monitor):
         A tensors with mean and variance for each neuron/state along the last dim
     """
 
-    def __init__(self, group: CellGroup, state: str = "input") -> None:
+    def __init__(self, group: CellGroup, state: str = "input", dim = None) -> None:
         super().__init__()
         self.group = group
         self.key = state
+        self.dim = dim
 
     def reset(self) -> None:
         self.s = 0
@@ -219,6 +220,8 @@ class MeanVarianceMonitor(Monitor):
 
     def execute(self) -> None:
         tns = self.group.states[self.key]
+        if self.dim is not None:
+            tns = torch.mean(tns, dim=self.dim)
         self.s += tns.detach()
         self.s2 += torch.square(tns).detach()
         self.c += 1

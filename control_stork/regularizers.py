@@ -30,7 +30,8 @@ class ActivityRegularizer:
     def __call__(self, group) -> torch.Tensor:
         """Expects input with (batch x time x units)"""
         act = group.get_out_sequence()  # get output
-        cnt = torch.sum(act, dim=1)  # get spikecount
+        # cnt = torch.sum(act, dim=1)  # get spikecount
+        cnt = torch.mean(act, dim=1)  # get average "firing rate"
 
         # if population-level regularizer, calculate mean across defined dims
         if self.dims:
