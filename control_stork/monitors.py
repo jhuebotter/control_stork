@@ -149,10 +149,11 @@ class PopulationSpikeCountMonitor(Monitor):
         A tensor with spike counts for each input and neuron
     """
 
-    def __init__(self, group: CellGroup, per_example: bool = False) -> None:
+    def __init__(self, group: CellGroup, per_example: bool = False, avg: bool = False) -> None:
         super().__init__()
         self.group = group
         self.per_example = per_example
+        self.avg = avg
 
     def reset(self) -> None:
         self.data = []
@@ -163,7 +164,10 @@ class PopulationSpikeCountMonitor(Monitor):
     def get_data(self) -> torch.Tensor:
         if not self.data:
             return None
-        s1 = torch.sum(torch.stack(self.data, dim=1), dim=1).cpu()
+        if self.avg:
+            s1 = torch.mean(torch.stack(self.data, dim=1), dim=1).cpu()
+        else:
+            s1 = torch.sum(torch.stack(self.data, dim=1), dim=1).cpu()
         return torch.mean(s1, dim=1) if self.per_example else torch.mean(s1)
 
 
