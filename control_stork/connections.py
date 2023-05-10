@@ -19,8 +19,8 @@ from .extratypes import *
 class BaseConnection(core.NetworkNode):
     def __init__(
         self,
-        src, #: nodes.CellGroup,
-        dst, #: nodes.CellGroup,
+        src,  #: nodes.CellGroup,
+        dst,  #: nodes.CellGroup,
         target: Optional[str] = None,
         name: Optional[str] = None,
         regularizers: Optional[Iterable] = None,
@@ -56,7 +56,7 @@ class BaseConnection(core.NetworkNode):
         else:
             raise ValueError
 
-    def init_parameters(self, initializer) -> None: 
+    def init_parameters(self, initializer) -> None:
         """
         Initializes connection weights and biases.
         """
@@ -173,7 +173,12 @@ class BottleneckLinearConnection(BaseConnection):
         self.flatten_input = flatten_input
         self.n_dims = n_dims
 
-        self.pre_op = nn.Linear(src.nb_units if flatten_input else src.shape[0], self.n_dims, bias=bias, **kwargs)
+        self.pre_op = nn.Linear(
+            src.nb_units if flatten_input else src.shape[0],
+            self.n_dims,
+            bias=bias,
+            **kwargs
+        )
         self.op = nn.Linear(self.n_dims, dst.shape[0], bias=bias, **kwargs)
 
         for param in self.pre_op.parameters():

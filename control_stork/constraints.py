@@ -1,5 +1,5 @@
 import torch
-from . extratypes import *
+from .extratypes import *
 
 
 class WeightConstraint:

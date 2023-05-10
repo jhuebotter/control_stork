@@ -6,6 +6,7 @@ from .nodes import CellGroup
 
 # TODO: add docstrings
 
+
 class Monitor:
     def __init__(self) -> None:
         self.reset()
@@ -39,7 +40,7 @@ class SpikeMonitor(Monitor):
         self.data = []
 
     def execute(self) -> None:
-        self.data.append(self.group.states['out'].detach())
+        self.data.append(self.group.states["out"].detach())
 
     def get_data(self) -> torch.Tensor:
         if not self.data:
@@ -80,7 +81,7 @@ class StateMonitor(Monitor):
         if not self.data:
             return None
         return torch.stack(self.data, dim=1).cpu()
-    
+
 
 class PlotStateMonitor(StateMonitor):
     """Records the state of a neuron group over time and plots it
@@ -102,7 +103,7 @@ class PlotStateMonitor(StateMonitor):
         self.plot_fn = plot_fn
         self.kwargs = kwargs
 
-    def get_data(self) -> 'matplotlib.figure.Figure':
+    def get_data(self) -> "matplotlib.figure.Figure":
         data = super().get_data()
         if data is None:
             return None
@@ -138,6 +139,7 @@ class SpikeCountMonitor(Monitor):
             return None
         return self.data.cpu()
 
+
 class PopulationSpikeCountMonitor(Monitor):
     """Counts total number of spikes (sum over time in get_out_sequence() for the group)
 
@@ -149,7 +151,9 @@ class PopulationSpikeCountMonitor(Monitor):
         A tensor with spike counts for each input and neuron
     """
 
-    def __init__(self, group: CellGroup, per_example: bool = False, avg: bool = False) -> None:
+    def __init__(
+        self, group: CellGroup, per_example: bool = False, avg: bool = False
+    ) -> None:
         super().__init__()
         self.group = group
         self.per_example = per_example
@@ -159,7 +163,7 @@ class PopulationSpikeCountMonitor(Monitor):
         self.data = []
 
     def execute(self) -> None:
-        self.data.append(self.group.states['out'].detach())
+        self.data.append(self.group.states["out"].detach())
 
     def get_data(self) -> torch.Tensor:
         if not self.data:
@@ -189,7 +193,7 @@ class PopulationFiringRateMonitor(Monitor):
         self.data = []
 
     def execute(self) -> None:
-        self.data.append(self.group.states['out'].detach())
+        self.data.append(self.group.states["out"].detach())
 
     def get_data(self) -> torch.Tensor:
         if not self.data:
@@ -211,7 +215,7 @@ class MeanVarianceMonitor(Monitor):
         A tensors with mean and variance for each neuron/state along the last dim
     """
 
-    def __init__(self, group: CellGroup, state: str = "input", dim = None) -> None:
+    def __init__(self, group: CellGroup, state: str = "input", dim=None) -> None:
         super().__init__()
         self.group = group
         self.key = state

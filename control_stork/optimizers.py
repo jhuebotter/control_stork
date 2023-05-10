@@ -1,6 +1,6 @@
 import torch
 
-from . extratypes import *
+from .extratypes import *
 
 
 class SMORMS3(torch.optim.Optimizer):

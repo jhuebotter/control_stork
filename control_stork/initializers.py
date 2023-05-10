@@ -63,14 +63,12 @@ class Initializer:
         bias_scale: float = 1.0,
         bias_mean: float = 0.0,
     ) -> None:
-
         self.scaling = scaling
         self.sparseness = sparseness
         self.bias_scale = bias_scale
         self.bias_mean = bias_mean
 
     def initialize(self, target: str) -> None:
-
         if isinstance(target, connections.BaseConnection):
             self.initialize_connection(target)
 
@@ -108,7 +106,6 @@ class Initializer:
             return weights
 
         elif self.scaling == "1/sqrt(k)":
-
             return weights / math.sqrt(fan_in)
 
         elif self.scaling == "1/k":
@@ -193,7 +190,6 @@ class DistInitializer(Initializer):
     """
 
     def __init__(self, dist=dists.Normal(0, 1), **kwargs):
-
         super().__init__(**kwargs)
 
         # assert validity of distribution object
@@ -207,7 +203,6 @@ class DistInitializer(Initializer):
         return self.dist.sample(shape)
 
     def initialize_connection(self, connection):
-
         # Sample weights
         weights = self._get_weights(connection)
 
@@ -217,7 +212,6 @@ class DistInitializer(Initializer):
 
 class KaimingNormalInitializer(Initializer):
     def __init__(self, gain=1.0, **kwargs):
-
         super().__init__(
             scaling=None,  # Fixed to None, as scaling is implemented in the weight sampling
             **kwargs
@@ -226,7 +220,6 @@ class KaimingNormalInitializer(Initializer):
         self.gain = gain
 
     def _get_weights(self, connection):
-
         fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(connection.op.weight)
 
         # get distribution
@@ -240,7 +233,6 @@ class KaimingNormalInitializer(Initializer):
         return weights
 
     def initialize_connection(self, connection):
-
         # Sample weights
         weights = self._get_weights(connection)
 
@@ -250,23 +242,20 @@ class KaimingNormalInitializer(Initializer):
 
 class ConstantInitializer(Initializer):
     def __init__(self, value: Union[float, torch.Tensor], **kwargs):
-
-        super().__init__(
-            **kwargs
-        )
+        super().__init__(**kwargs)
 
         self.value = value
 
     def _get_weights(self, connection):
-
         # get weight matrix
         shape = connection.op.weight.shape
-        weights = torch.tensor(self.value, device=connection.op.weight.device).expand(shape)
+        weights = torch.tensor(self.value, device=connection.op.weight.device).expand(
+            shape
+        )
 
         return weights
 
     def initialize_connection(self, connection):
-
         # Sample weights
         weights = self._get_weights(connection)
 
@@ -276,14 +265,12 @@ class ConstantInitializer(Initializer):
 
 class AverageInitializer(Initializer):
     def __init__(self, **kwargs):
-
-        super().__init__(
-            **kwargs
-        )
+        super().__init__(**kwargs)
 
     def _get_weights(self, connection):
-
-        fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(connection.op.weight)
+        fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(
+            connection.op.weight
+        )
 
         assert fan_in % fan_out == 0, "fan_in must be a multiple of fan_out"
 
@@ -291,12 +278,15 @@ class AverageInitializer(Initializer):
 
         # get weight matrix
         shape = connection.op.weight.shape
-        weights = torch.block_diag(*[torch.ones(factor) / factor] * fan_out).expand(shape).to(connection.op.weight.device)
+        weights = (
+            torch.block_diag(*[torch.ones(factor) / factor] * fan_out)
+            .expand(shape)
+            .to(connection.op.weight.device)
+        )
 
         return weights
 
     def initialize_connection(self, connection):
-
         # Sample weights
         weights = self._get_weights(connection)
 
@@ -340,7 +330,6 @@ class FluctuationDrivenNormalInitializer(Initializer):
         alpha=0.9,
         **kwargs
     ):
-
         super().__init__(
             scaling=None,  # None, as scaling is implemented in the weight sampling
             **kwargs
@@ -365,7 +354,6 @@ class FluctuationDrivenNormalInitializer(Initializer):
         return ebar, ehat
 
     def _get_weights(self, connection, mu_w, sigma_w):
-
         shape = connection.op.weight.shape
 
         # sample weights
@@ -438,7 +426,6 @@ class FluctuationDrivenNormalInitializer(Initializer):
         params = []
 
         for c in dst.afferents:
-
             # Number of presynaptic neurons
             N, _ = torch.nn.init._calculate_fan_in_and_fan_out(c.op.weight)
 
@@ -463,17 +450,14 @@ class FluctuationDrivenNormalInitializer(Initializer):
         return params
 
     def initialize_layer(self, layer):
-
         # Loop through each population in this layer
         for neurons in layer.neurons:
-
             # Consider all afferents to this population
             # and compute weight parameters for each connection
             weight_params = self._get_weight_parameters_dst(neurons)
 
             # Initialize each connection
             for idx, connection in enumerate(neurons.afferents):
-
                 # Read out parameters for weight distribution
                 mu_w, sigma_w = weight_params[idx]
                 # sample weights
@@ -492,7 +476,6 @@ class FluctuationDrivenCenteredNormalInitializer(FluctuationDrivenNormalInitiali
     def __init__(
         self, sigma_u, nu, time_step, epsilon_calc_mode="numerical", alpha=0.9, **kwargs
     ):
-
         super().__init__(
             mu_u=0.0,
             xi=1 / sigma_u,
@@ -508,7 +491,6 @@ class FluctuationDrivenExponentialInitializer(FluctuationDrivenNormalInitializer
     def __init__(
         self, sigma_u, nu, time_step, epsilon_calc_mode="numerical", alpha=0.9, **kwargs
     ):
-
         super().__init__(
             mu_u=0.0,  # Fixed to balanced state
             xi=1 / sigma_u,
@@ -610,7 +592,6 @@ class FluctuationDrivenExponentialInitializer(FluctuationDrivenNormalInitializer
 
         # If there is recurrent excitation, use alpha scaling factor
         if nb_exc_rec >= 1:
-
             alpha = self.alpha
 
             delta_REC = np.sqrt(
@@ -668,10 +649,8 @@ class FluctuationDrivenExponentialInitializer(FluctuationDrivenNormalInitializer
         return params
 
     def initialize_layer(self, layer):
-
         # Loop through each population in this layer
         for neurons in layer.neurons:
-
             # Consider all afferents to this population
             # and compute weight parameters for each connection
             weight_params = self._get_weight_parameters_dst(neurons)
@@ -690,7 +669,6 @@ class SpikeInitLogNormalInitializer(FluctuationDrivenNormalInitializer):
     def __init__(
         self, sigma_u, nu, time_step, epsilon_calc_mode="numerical", alpha=0.9, **kwargs
     ):
-
         super().__init__(
             mu_u=0.0,  # Fixed to balanced state
             xi=1 / sigma_u,
@@ -792,7 +770,6 @@ class SpikeInitLogNormalInitializer(FluctuationDrivenNormalInitializer):
 
         # If there is recurrent excitation, use alpha scaling factor
         if nb_exc_rec >= 1:
-
             alpha = self.alpha
 
             delta_REC = 1 / 2 * np.log(
@@ -875,10 +852,8 @@ class SpikeInitLogNormalInitializer(FluctuationDrivenNormalInitializer):
         return params
 
     def initialize_layer(self, layer):
-
         # Loop through each population in this layer
         for neurons in layer.neurons:
-
             # Consider all afferents to this population
             # and compute weight parameters for each connection
             weight_params = self._get_weight_parameters_dst(neurons)

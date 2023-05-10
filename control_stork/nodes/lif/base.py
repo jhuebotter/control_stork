@@ -184,7 +184,6 @@ class FastLIFGroup(LIFGroup):
         )
 
     def forward(self):
-
         # synaptic & membrane dynamics
         new_syn = self.dcy_syn * self.syn + self.input
         new_mem = self.dcy_mem * self.mem + self.scl_mem * new_syn

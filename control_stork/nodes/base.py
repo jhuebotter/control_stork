@@ -4,9 +4,10 @@ import torch.nn as nn
 import numpy as np
 
 from .. import core
-from .. extratypes import *
+from ..extratypes import *
 
 # TODO: add docstrings
+
 
 class CellGroup(core.NetworkNode):
     """
@@ -124,7 +125,6 @@ class CellGroup(core.NetworkNode):
         )
 
     def reset_state(self, batch_size: int = 1) -> None:
-
         self.int_shape = (batch_size,) + self.shape
         # ? can remove this? And the function that uses it
         # self.flat_seq_shape = (batch_size, self.nb_steps, self.nb_units)

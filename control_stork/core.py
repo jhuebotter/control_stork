@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from . extratypes import *
+from .extratypes import *
 
 
 class NetworkNode(nn.Module):
@@ -31,7 +31,6 @@ class NetworkNode(nn.Module):
     def configure(
         self, time_step: float, device: torch.device, dtype: torch.dtype
     ) -> None:
-        
         # removed batch_size and nb_steps
 
         self.time_step = time_step
@@ -40,6 +39,6 @@ class NetworkNode(nn.Module):
 
     def remove_regularizers(self) -> None:
         self.regularizers = []
-    
+
     def __repr__(self) -> str:
         return super().__repr__() + " " + self.name

@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from . import monitors
-from . extratypes import *
+from .extratypes import *
 
 
 # TODO: completely rewrite this class
@@ -38,7 +38,7 @@ class RecurrentSpikingModel(nn.Module):
                 self.device,
                 self.dtype,
             )
-    
+
     def configure_connections(self):
         for c in self.connections:
             c.configure(
@@ -128,14 +128,14 @@ class RecurrentSpikingModel(nn.Module):
     def get_monitor_data(self) -> dict:
         data = {}
         for m in self.monitors:
-            k = f'{m.__class__.__name__}'
-            if hasattr(m, 'group'):
-                k += f' on {m.group.name}'
-            if hasattr(m, 'key'):
-                k += f' for {m.key}'
+            k = f"{m.__class__.__name__}"
+            if hasattr(m, "group"):
+                k += f" on {m.group.name}"
+            if hasattr(m, "key"):
+                k += f" for {m.key}"
             data[k] = m.get_data()
         return data
-    
+
     def compute_regularizer_losses(self):
         reg_loss = torch.zeros(1, device=self.device)
         for g in self.groups:
@@ -151,7 +151,6 @@ class RecurrentSpikingModel(nn.Module):
             c.remove_regularizers()
 
     def forward(self, x, record=False):
-
         N, T, _ = x.shape
 
         self.input_group.feed_data(x)
@@ -169,7 +168,7 @@ class RecurrentSpikingModel(nn.Module):
         else:
             target_y = target_y.to(self.device)
 
-        # TODO: rework how loss is computed 
+        # TODO: rework how loss is computed
 
         self.out_loss = self.loss_stack(output, target_y)
 
@@ -182,7 +181,6 @@ class RecurrentSpikingModel(nn.Module):
         return total_loss
 
     def regtrain_epoch(self, dataset, shuffle=True):
-
         # TODO: rework how training is done especially with the loss computation
 
         self.train(True)
@@ -364,7 +362,6 @@ class RecurrentSpikingModel(nn.Module):
 
         # if there is a gradient monitor
         if any([isinstance(m, monitors.GradientMonitor) for m in self.monitors]):
-
             self.prepare_data(dataset)
 
             # Set monitors to record gradients
@@ -452,7 +449,7 @@ class RecurrentSpikingModel(nn.Module):
             return results, test_scores, callback_returns
         else:
             return results, test_scores
-        
+
     def count_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
@@ -474,17 +471,20 @@ class RecurrentSpikingModel(nn.Module):
         print("\n## Trainable Parameters")
 
         print("Total number of trainable parameters: %i" % self.count_parameters())
-        print("Number of parameter objects:" , len([p for p in self.parameters() if p.requires_grad]))
+        print(
+            "Number of parameter objects:",
+            len([p for p in self.parameters() if p.requires_grad]),
+        )
 
     def __str__(self):
         self.summary()
-        return ''
-    
+        return ""
+
     def to(self, device):
         self.device = device
 
         return self
-    
+
     def to(self, device):
         self.device = device
         super().to(device)

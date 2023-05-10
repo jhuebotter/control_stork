@@ -2,9 +2,10 @@ import numpy as np
 import torch
 
 from . import CellGroup
-from .. extratypes import *
+from ..extratypes import *
 
 # TODO: add docstrings
+
 
 class ReadoutGroup(CellGroup):
     def __init__(
@@ -20,11 +21,12 @@ class ReadoutGroup(CellGroup):
         **kwargs
     ) -> None:
         super().__init__(
-            shape, 
-            stateful=stateful, 
+            shape,
+            stateful=stateful,
             name="Readout" if name is None else name,
             store_sequences=store_sequences,
-            **kwargs)
+            **kwargs
+        )
         self.tau_mem = tau_mem
         self.tau_syn = tau_syn
         self.store_output_seq = True
@@ -102,11 +104,12 @@ class DirectReadoutGroup(CellGroup):
         **kwargs
     ) -> None:
         super().__init__(
-            shape, 
-            stateful=stateful, 
+            shape,
+            stateful=stateful,
             name="Direct Readout" if name is None else name,
             store_sequences=store_sequences,
-            **kwargs)
+            **kwargs
+        )
         self.store_output_seq = True
         self.initial_state = initial_state  # ? why is this not 0?
         self.weight_scale = weight_scale  # ? what is this good for?
@@ -131,17 +134,18 @@ class TimeAverageReadoutGroup(CellGroup):
         stateful: bool = False,  # ? what is this good for? Why is it not True?
         name: Optional[str] = None,
         store_sequences: Optional[Iterable] = ["out"],
-        **kwargs        
+        **kwargs
     ) -> None:
         super().__init__(
-            shape, 
-            stateful=stateful, 
+            shape,
+            stateful=stateful,
             name="Time Average Readout" if name is None else name,
             store_sequences=store_sequences,
-            **kwargs)
+            **kwargs
+        )
         self.store_output_seq = True
         self.initial_state = initial_state  # ? why is this not 0?
-        self.weight_scale = weight_scale 
+        self.weight_scale = weight_scale
         self.steps = steps
         self.out = None
         self.syn = None

@@ -12,12 +12,13 @@ from .extratypes import *
 # TODO: add docstrings
 # TODO: add support for diverse tau_mem and tau_syn values
 
+
 class AbstractLayer:
     """
     Abstract base class for layer object
     """
 
-    def __init__(self, name: str, model, recurrent, dalian: bool=False) -> None:
+    def __init__(self, name: str, model, recurrent, dalian: bool = False) -> None:
         super().__init__()
 
         self.model = model
@@ -110,7 +111,6 @@ class Layer(AbstractLayer):
         connection_kwargs={},
         recurrent_connection_kwargs=None,
     ) -> None:
-
         super().__init__(name, model, recurrent)
 
         # Make neuron group
@@ -165,7 +165,6 @@ class ConvLayer(AbstractLayer):
         connection_kwargs={},
         recurrent_connection_kwargs={},
     ) -> None:
-
         super().__init__(name, model, recurrent)
 
         # Calculate size of Convolutional Layer
@@ -211,7 +210,6 @@ class ConvLayer(AbstractLayer):
 
         # Make recurrent connection
         if recurrent:
-
             rec_kernel_size = recurrent_connection_kwargs.pop("kernel_size", 5)
             rec_stride = recurrent_connection_kwargs.pop("stride", 1)
             rec_padding = recurrent_connection_kwargs.pop("padding", 2)
@@ -255,7 +253,6 @@ class DalianLayer(AbstractLayer):
         rec_inh_connection_kwargs={},
         rec_exc_connection_kwargs={},
     ) -> None:
-
         super().__init__(name, model, recurrent=recurrent, dalian=True)
 
         # Add Dalian constraint
@@ -335,7 +332,6 @@ class DalianLayer(AbstractLayer):
         # # # # # # # # # # # # # #
 
         if recurrent:
-
             con_EI = connection_class(
                 nodes_exc,
                 nodes_inh,

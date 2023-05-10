@@ -4,15 +4,14 @@ import math
 
 
 class SurrogateSpike(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, *args, **kwargs):
         raise NotImplementedError
-    
+
     @staticmethod
     def backward(ctx, *args, **kwargs):
         raise NotImplementedError
-    
+
     def __call__(self, *args, **kwargs):
         # This is a hack to make the class callable like other activation functions
         return self.apply(*args, **kwargs)
@@ -417,8 +416,12 @@ class SuperSpike_norm(SurrogateSpike):
         return standard_grad
 
 
-def gaussian(x, mu=0., sigma=.5):
-    return torch.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) / torch.sqrt(2 * torch.tensor(math.pi)) / sigma
+def gaussian(x, mu=0.0, sigma=0.5):
+    return (
+        torch.exp(-((x - mu) ** 2) / (2 * sigma**2))
+        / torch.sqrt(2 * torch.tensor(math.pi))
+        / sigma
+    )
 
 
 class GaussianSpike(SurrogateSpike):
@@ -429,10 +432,10 @@ class GaussianSpike(SurrogateSpike):
     self.beta (default=100).
     """
 
-    gamma = .5  # gradient scale
+    gamma = 0.5  # gradient scale
     lens = 0.3
     scale = 6.0
-    hight = .15
+    hight = 0.15
 
     @staticmethod
     def forward(ctx, input):  # input = membrane potential- threshold
@@ -450,16 +453,29 @@ class GaussianSpike(SurrogateSpike):
         In the backward pass we receive a Tensor containing the gradient of the
         loss with respect to the output, and we compute the surrogate gradient
         of the loss with respect to the input. Here we assume the standardized
-        negative part of a fast sigmoid as this was done in Yin, Corradi, and 
+        negative part of a fast sigmoid as this was done in Yin, Corradi, and
         Bothe (2021).
         """
-        input, = ctx.saved_tensors
+        (input,) = ctx.saved_tensors
         grad_input = grad_output.clone()
 
         # temp =  gaussian(input, mu=0., sigma=GaussianSpike.lens)
         # temp = torch.exp(-(input**2)/(2*GaussianSpike.lens**2))/torch.sqrt(2*torch.tensor(math.pi))/GaussianSpike.lens
-        
-        temp = gaussian(input, mu=0., sigma=GaussianSpike.lens) * (1. + GaussianSpike.hight) \
-               - gaussian(input, mu=GaussianSpike.lens, sigma=GaussianSpike.scale * GaussianSpike.lens) * GaussianSpike.hight \
-               - gaussian(input, mu=-GaussianSpike.lens, sigma=GaussianSpike.scale * GaussianSpike.lens) * GaussianSpike.hight
+
+        temp = (
+            gaussian(input, mu=0.0, sigma=GaussianSpike.lens)
+            * (1.0 + GaussianSpike.hight)
+            - gaussian(
+                input,
+                mu=GaussianSpike.lens,
+                sigma=GaussianSpike.scale * GaussianSpike.lens,
+            )
+            * GaussianSpike.hight
+            - gaussian(
+                input,
+                mu=-GaussianSpike.lens,
+                sigma=GaussianSpike.scale * GaussianSpike.lens,
+            )
+            * GaussianSpike.hight
+        )
         return grad_input * temp.float() * GaussianSpike.gamma

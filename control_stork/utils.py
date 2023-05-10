@@ -102,15 +102,15 @@ def get_lif_kernel(
     """
     tau_max = np.max((tau_mem, tau_syn))
     T_max = np.max((int(tau_max * 10 / dt), 1))
-    #ts = np.arange(0, int(tau_max * 10 / dt)) * dt
+    # ts = np.arange(0, int(tau_max * 10 / dt)) * dt
     ts = np.arange(0, T_max) * dt
     n = len(ts)
     n = len(ts)
     kernel = np.empty(n)
     I = 1.0  # Initialize current variable for single spike input
     U = 0.0
-    dcy1 = torch.exp(- dt / torch.tensor(tau_mem))
-    dcy2 = torch.exp(- dt / torch.tensor(tau_syn))
+    dcy1 = torch.exp(-dt / torch.tensor(tau_mem))
+    dcy2 = torch.exp(-dt / torch.tensor(tau_syn))
     for i, t in enumerate(ts):
         kernel[i] = U
         U = dcy1 * U + (1.0 - dcy1) * I
