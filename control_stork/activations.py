@@ -1,8 +1,24 @@
 import torch
 import torch.nn as nn
+import math
 
 
-class SuperSpike(torch.autograd.Function):
+class SurrogateSpike(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, *args, **kwargs):
+        raise NotImplementedError
+    
+    @staticmethod
+    def backward(ctx, *args, **kwargs):
+        raise NotImplementedError
+    
+    def __call__(self, *args, **kwargs):
+        # This is a hack to make the class callable like other activation functions
+        return self.apply(*args, **kwargs)
+
+
+class SuperSpike(SurrogateSpike):
     """
     Autograd SuperSpike nonlinearity implementation.
 
@@ -39,7 +55,7 @@ class SuperSpike(torch.autograd.Function):
         return grad
 
 
-class SuperSpike_MemClamp(torch.autograd.Function):
+class SuperSpike_MemClamp(SurrogateSpike):
     """
     Variant of SuperSpike with clamped membrane potential at 1.0
     """
@@ -76,7 +92,7 @@ class SuperSpike_MemClamp(torch.autograd.Function):
         return grad
 
 
-class SuperSpike_rescaled(torch.autograd.Function):
+class SuperSpike_rescaled(SurrogateSpike):
     """
     Version of SuperSpike where the gradient is re-scaled so that it equals one at
     resting membrane potential
@@ -116,7 +132,7 @@ class SuperSpike_rescaled(torch.autograd.Function):
         return grad
 
 
-class MultiSpike(torch.autograd.Function):
+class MultiSpike(SurrogateSpike):
     """
     Autograd MultiSpike nonlinearity implementation.
 
@@ -160,7 +176,7 @@ class MultiSpike(torch.autograd.Function):
         return grad
 
 
-class SuperSpike_asymptote(torch.autograd.Function):
+class SuperSpike_asymptote(SurrogateSpike):
     """
     Autograd SuperSpike nonlinearity implementation with asymptotic behavior of step.
 
@@ -201,7 +217,7 @@ class SuperSpike_asymptote(torch.autograd.Function):
         return grad
 
 
-class TanhSpike(torch.autograd.Function):
+class TanhSpike(SurrogateSpike):
     """
     Autograd Tanh et al. nonlinearity implementation.
 
@@ -239,7 +255,7 @@ class TanhSpike(torch.autograd.Function):
         return grad
 
 
-class SigmoidSpike(torch.autograd.Function):
+class SigmoidSpike(SurrogateSpike):
     """
     Autograd surrogate gradient nonlinearity implementation which uses the derivative of a sigmoid in the backward pass.
 
@@ -277,7 +293,7 @@ class SigmoidSpike(torch.autograd.Function):
         return grad
 
 
-class EsserSpike(torch.autograd.Function):
+class EsserSpike(SurrogateSpike):
     """
     Autograd surrogate gradient nonlinearity implementation which uses piecewise linear pseudo derivative in the backward pass as suggested in:
 
@@ -321,7 +337,7 @@ class EsserSpike(torch.autograd.Function):
         return grad
 
 
-class HardTanhSpike(torch.autograd.Function):
+class HardTanhSpike(SurrogateSpike):
     """
     Autograd Esser et al. nonlinearity implementation.
 
@@ -359,7 +375,7 @@ class HardTanhSpike(torch.autograd.Function):
         return grad
 
 
-class SuperSpike_norm(torch.autograd.Function):
+class SuperSpike_norm(SurrogateSpike):
     """
     Autograd SuperSpike nonlinearity implementation.
 
@@ -399,3 +415,51 @@ class SuperSpike_norm(torch.autograd.Function):
             SuperSpike_norm.xi + torch.norm(torch.mean(grad, dim=0))
         )
         return standard_grad
+
+
+def gaussian(x, mu=0., sigma=.5):
+    return torch.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) / torch.sqrt(2 * torch.tensor(math.pi)) / sigma
+
+
+class GaussianSpike(SurrogateSpike):
+    """
+    Autograd Gaussian nonlinearity implementation.
+
+    The steepness parameter beta can be accessed via the static member
+    self.beta (default=100).
+    """
+
+    gamma = .5  # gradient scale
+    lens = 0.3
+    scale = 6.0
+    hight = .15
+
+    @staticmethod
+    def forward(ctx, input):  # input = membrane potential- threshold
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the step function output. ctx is the context object
+        that is used to stash information for backward pass computations.
+        """
+        ctx.save_for_backward(input)
+        return input.gt(0).float()  # is firing ???
+
+    @staticmethod
+    def backward(ctx, grad_output):  # approximate the gradients
+        """
+        In the backward pass we receive a Tensor containing the gradient of the
+        loss with respect to the output, and we compute the surrogate gradient
+        of the loss with respect to the input. Here we assume the standardized
+        negative part of a fast sigmoid as this was done in Yin, Corradi, and 
+        Bothe (2021).
+        """
+        input, = ctx.saved_tensors
+        grad_input = grad_output.clone()
+
+        # temp =  gaussian(input, mu=0., sigma=GaussianSpike.lens)
+        # temp = torch.exp(-(input**2)/(2*GaussianSpike.lens**2))/torch.sqrt(2*torch.tensor(math.pi))/GaussianSpike.lens
+        
+        temp = gaussian(input, mu=0., sigma=GaussianSpike.lens) * (1. + GaussianSpike.hight) \
+               - gaussian(input, mu=GaussianSpike.lens, sigma=GaussianSpike.scale * GaussianSpike.lens) * GaussianSpike.hight \
+               - gaussian(input, mu=-GaussianSpike.lens, sigma=GaussianSpike.scale * GaussianSpike.lens) * GaussianSpike.hight
+        return grad_input * temp.float() * GaussianSpike.gamma
