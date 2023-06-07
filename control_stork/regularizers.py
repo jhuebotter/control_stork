@@ -1,11 +1,11 @@
 import torch
-
+from extratypes import *
 
 class ActivityRegularizer:
     """Abstract base class for activity regularizers."""
 
     def __init__(
-        self, strength: float = 1.0, threshold: float = 0.0, dims: int = -1
+        self, strength: float = 1.0, threshold: float = 0.0, dims: Optional[Union[int, tuple, list]] = -1
     ) -> None:
         """Constructor
 
@@ -15,8 +15,7 @@ class ActivityRegularizer:
             dims (int, optional): The dimensions to average spikes/activity excluding time dimension.
                                   Defaults to -1, which supports fully connected networks and 1D-Conv nets.
                                   For 2D-Conv nets, set to dims=(-2,-1) or dims=(3,4) (equivalent).
-
-                                  To implement a per-neuron regularizer, set dims=False.
+                                  To implement a per-neuron regularizer, set dims=None or 0 to average over the batch.
         """
 
         self.strength = float(strength)
@@ -24,7 +23,7 @@ class ActivityRegularizer:
         self.dims = dims
 
         # Assert that dimensions is either False, int, tuple or list
-        if self.dims:
+        if self.dims is not None:
             assert isinstance(self.dims, (int, tuple, list))
 
     def __call__(self, group) -> torch.Tensor:
@@ -34,7 +33,7 @@ class ActivityRegularizer:
         cnt = torch.mean(act, dim=1)  # get average "firing rate"
 
         # if population-level regularizer, calculate mean across defined dims
-        if self.dims:
+        if self.dims is not None:
             cnt = torch.mean(cnt, dim=self.dims)
 
         return self.calc_regloss(cnt)

@@ -13,6 +13,8 @@ class LIFGroup(CellGroup):
         shape,
         tau_mem=10e-3,
         tau_syn=5e-3,
+        threshold=1.0,
+        reset='sub',
         diff_reset=False,
         learn_timescales=False,
         clamp_mem=False,
@@ -36,6 +38,11 @@ class LIFGroup(CellGroup):
             :type tau_mem: float
             :param tau_syn: The synaptic time constant in s, defaults to 5e-3
             :type tau_syn: float
+            :param threshold: The threshold potential in V, defaults to 1.0
+            :type threshold: float
+            :param reset: The reset mode, either 'sub' for subtractive or 'set' for setting the membrane potential to 0,
+                            defaults to 'sub'
+            :type reset: str
             :param diff_reset: Whether or not to differentiate through the reset term, defaults to False
             :type diff_reset: bool
             :param learn_timescales: Whether to learn the membrane and synaptic time constants, defaults to False
@@ -59,6 +66,11 @@ class LIFGroup(CellGroup):
         )
         self.tau_mem = tau_mem
         self.tau_syn = tau_syn
+        self.threshold = threshold
+        self.reset = reset.lower()
+        if self.reset not in ["sub", "set"]:
+            raise ValueError("reset must be either 'sub' or 'set'")
+        self.reset_mem = self.subtractive_reset if self.reset == "sub" else self.multiplicative_reset
         self.activation = activation
         self.spk_nl = self.activation.apply
         self.diff_reset = diff_reset
@@ -96,8 +108,16 @@ class LIFGroup(CellGroup):
             self.int_shape, device=self.device, dtype=self.dtype
         )
 
+    def multiplicative_reset(self, mem, rst):
+
+        return mem * (1.0 - rst)
+    
+    def subtractive_reset(self, mem, rst):
+
+        return mem - self.threshold * rst
+
     def get_spike_and_reset(self, mem):
-        mthr = mem - 1.0
+        mthr = mem - self.threshold
 
         out = self.spk_nl(mthr)
         if self.diff_reset:
@@ -114,9 +134,10 @@ class LIFGroup(CellGroup):
 
         # synaptic & membrane dynamics
         new_syn = self.dcy_syn * self.syn + self.input
-        new_mem = (self.dcy_mem * self.mem + self.scl_mem * self.syn) * (
-            1.0 - rst
-        )  # multiplicative reset
+        # update the membrane potential
+        new_mem = (self.dcy_mem * self.mem + self.scl_mem * self.syn)
+        # reset
+        new_mem = self.reset_mem(new_mem, rst)
 
         # Clamp membrane potential
         if self.clamp_mem:
@@ -133,6 +154,8 @@ class FastLIFGroup(LIFGroup):
         shape,
         tau_mem=10e-3,
         tau_syn=5e-3,
+        threshold=1.0,
+        reset="sub",
         diff_reset=False,
         learn_timescales=False,
         clamp_mem=False,
@@ -156,6 +179,10 @@ class FastLIFGroup(LIFGroup):
             :type tau_mem: float
             :param tau_syn: The synaptic time constant in s, defaults to 5e-3
             :type tau_syn: float
+            :param threshold: The threshold potential in V, defaults to 1.0
+            :type threshold: float
+            :param reset: The reset mode, either 'sub' for subtractive or 'set' for setting the membrane potential to the reset value, defaults to 'sub'
+            :type reset: str
             :param diff_reset: Whether or not to differentiate through the reset term, defaults to False
             :type diff_reset: bool
             :param learn_timescales: Whether to learn the membrane and synaptic time constants, defaults to False
@@ -172,6 +199,8 @@ class FastLIFGroup(LIFGroup):
             shape,
             tau_mem,
             tau_syn,
+            threshold,
+            reset,
             diff_reset,
             learn_timescales,
             clamp_mem,
@@ -208,6 +237,8 @@ class NoisyFastLIFGroup(FastLIFGroup):
         shape,
         tau_mem=10e-3,
         tau_syn=5e-3,
+        threshold=1.0,
+        reset="sub",
         diff_reset=False,
         learn_timescales=False,
         clamp_mem=False,
@@ -232,6 +263,10 @@ class NoisyFastLIFGroup(FastLIFGroup):
             :type tau_mem: float
             :param tau_syn: The synaptic time constant in s, defaults to 5e-3
             :type tau_syn: float
+            :param threshold: The threshold potential in V, defaults to 1.0
+            :type threshold: float
+            :param reset: The reset mode, either 'sub' for subtractive or 'set' for setting the membrane potential to the reset value, defaults to 'sub'
+            :type reset: str
             :param diff_reset: Whether or not to differentiate through the reset term, defaults to False
             :type diff_reset: bool
             :param learn_timescales: Whether to learn the membrane and synaptic time constants, defaults to False
@@ -250,6 +285,8 @@ class NoisyFastLIFGroup(FastLIFGroup):
             shape,
             tau_mem,
             tau_syn,
+            threshold,
+            reset,
             diff_reset,
             learn_timescales,
             clamp_mem,
