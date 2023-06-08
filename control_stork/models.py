@@ -125,10 +125,12 @@ class RecurrentSpikingModel(nn.Module):
         for m in self.monitors:
             m.execute()
 
-    def get_monitor_data(self) -> dict:
+    def get_monitor_data(self, exclude: list = []) -> dict:
         data = {}
         for m in self.monitors:
             k = f"{m.__class__.__name__}"
+            if k in exclude:
+                continue
             if hasattr(m, "group"):
                 k += f" on {m.group.name}"
             if hasattr(m, "key"):
