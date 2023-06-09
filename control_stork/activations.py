@@ -428,8 +428,6 @@ class GaussianSpike(SurrogateSpike):
     """
     Autograd Gaussian nonlinearity implementation.
 
-    The steepness parameter beta can be accessed via the static member
-    self.beta (default=100).
     """
 
     gamma = 0.5  # gradient scale
