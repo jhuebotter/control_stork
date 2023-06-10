@@ -129,15 +129,14 @@ class LIFGroup(CellGroup):
         return out, rst
 
     def forward(self):
-        # spike & reset
+        # spike
         new_out, rst = self.get_spike_and_reset(self.mem)
-
-        # synaptic & membrane dynamics
-        new_syn = self.dcy_syn * self.syn + self.input
-        # update the membrane potential
-        new_mem = (self.dcy_mem * self.mem + self.scl_mem * self.syn)
         # reset
         new_mem = self.reset_mem(new_mem, rst)
+        # synaptic dynamics
+        new_syn = self.dcy_syn * self.syn + self.input
+        # membrane dynamics
+        new_mem = (self.dcy_mem * self.mem + self.scl_mem * self.syn)
 
         # Clamp membrane potential
         if self.clamp_mem:
@@ -217,10 +216,10 @@ class FastLIFGroup(LIFGroup):
         new_syn = self.dcy_syn * self.syn + self.input
         new_mem = self.dcy_mem * self.mem + self.scl_mem * new_syn
 
-        # spike & reset
+        # spike
         new_out, rst = self.get_spike_and_reset(new_mem)
-
-        new_mem = new_mem * (1.0 - rst)  # multiplicative reset
+        # reset
+        new_mem = self.reset_mem(new_mem, rst)
 
         # Clamp membrane potential
         if self.clamp_mem:
@@ -301,7 +300,7 @@ class NoisyFastLIFGroup(FastLIFGroup):
         self.noise_std = noise_std
 
     def get_spike_and_reset(self, mem):
-        threshold = 1.0 + self.noise_std * torch.randn_like(mem)
+        threshold = self.threshold + self.noise_std * torch.randn_like(mem)
         mthr = mem - threshold
         out = self.spk_nl(mthr)
 
