@@ -453,6 +453,7 @@ class RecurrentSpikingModel(nn.Module):
             return results, test_scores
 
     def count_parameters(self):
+        # TODO: check if this counts MaskedTensor parameters correctly
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def summary(self):
@@ -481,11 +482,6 @@ class RecurrentSpikingModel(nn.Module):
     def __str__(self):
         self.summary()
         return ""
-
-    def to(self, device):
-        self.device = device
-
-        return self
 
     def to(self, device):
         self.device = device
