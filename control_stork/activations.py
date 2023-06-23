@@ -26,6 +26,7 @@ class SuperSpike(SurrogateSpike):
     """
 
     beta = 20.0
+    gamma = 1.0  # gradient scale
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -51,7 +52,7 @@ class SuperSpike(SurrogateSpike):
         (input,) = ctx.saved_tensors
         grad_input = grad_output.clone()
         grad = grad_input / (SuperSpike.beta * torch.abs(input) + 1.0) ** 2
-        return grad
+        return grad * SuperSpike.gamma
 
 
 class SuperSpike_MemClamp(SurrogateSpike):
@@ -60,6 +61,7 @@ class SuperSpike_MemClamp(SurrogateSpike):
     """
 
     beta = 20.0
+    gamma = 1.0  # gradient scale
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -88,7 +90,7 @@ class SuperSpike_MemClamp(SurrogateSpike):
             grad_input
             / (SuperSpike_MemClamp.beta * torch.abs(torch.relu(-input)) + 1.0) ** 2
         )
-        return grad
+        return grad * SuperSpike_MemClamp.gamma
 
 
 class SuperSpike_rescaled(SurrogateSpike):
@@ -98,6 +100,7 @@ class SuperSpike_rescaled(SurrogateSpike):
     """
 
     beta = 20.0
+    gamma = 1.0  # gradient scale
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -128,7 +131,7 @@ class SuperSpike_rescaled(SurrogateSpike):
             / (SuperSpike_rescaled.beta * torch.abs(input) + 1.0) ** 2
             / rescale_val
         )
-        return grad
+        return grad * SuperSpike_rescaled.gamma
 
 
 class MultiSpike(SurrogateSpike):
@@ -141,6 +144,8 @@ class MultiSpike(SurrogateSpike):
 
     beta = 100.0
     maxspk = 10.0
+    gamma = 1.0  # gradient scale
+
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -172,7 +177,7 @@ class MultiSpike(SurrogateSpike):
             )
             ** 2
         )
-        return grad
+        return grad * MultiSpike.gamma
 
 
 class SuperSpike_asymptote(SurrogateSpike):
@@ -184,6 +189,7 @@ class SuperSpike_asymptote(SurrogateSpike):
     """
 
     beta = 100.0
+    gamma = 1.0  # gradient scale
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -213,7 +219,7 @@ class SuperSpike_asymptote(SurrogateSpike):
             * grad_input
             / (SuperSpike_asymptote.beta * torch.abs(input) + 1.0) ** 2
         )
-        return grad
+        return grad * SuperSpike_asymptote.gamma
 
 
 class TanhSpike(SurrogateSpike):
@@ -225,6 +231,8 @@ class TanhSpike(SurrogateSpike):
     """
 
     beta = 100.0
+    gamma = 1.0  # gradient scale
+
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -251,7 +259,7 @@ class TanhSpike(SurrogateSpike):
         grad_input = grad_output.clone()
         beta = TanhSpike.beta
         grad = grad_input * (1.0 + (1.0 - torch.tanh(input * beta) ** 2))
-        return grad
+        return grad * TanhSpike.gamma
 
 
 class SigmoidSpike(SurrogateSpike):
@@ -262,6 +270,8 @@ class SigmoidSpike(SurrogateSpike):
     """
 
     beta = 100.0
+    gamma = 1.0  # gradient scale
+
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -289,7 +299,7 @@ class SigmoidSpike(SurrogateSpike):
         sig = torch.sigmoid(SigmoidSpike.beta * input)
         dsig = sig * (1.0 - sig)
         grad = grad_input * dsig
-        return grad
+        return grad * SigmoidSpike.gamma
 
 
 class EsserSpike(SurrogateSpike):
@@ -306,6 +316,8 @@ class EsserSpike(SurrogateSpike):
     """
 
     beta = 1.0
+    gamma = 1.0  # gradient scale
+
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -333,7 +345,7 @@ class EsserSpike(SurrogateSpike):
         grad = grad_input * torch.max(
             torch.zeros_like(input), 1.0 - torch.abs(EsserSpike.beta * input)
         )
-        return grad
+        return grad * EsserSpike.gamma
 
 
 class HardTanhSpike(SurrogateSpike):
@@ -345,6 +357,8 @@ class HardTanhSpike(SurrogateSpike):
     """
 
     beta = 100.0
+    gamma = 1.0  # gradient scale
+
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -371,7 +385,7 @@ class HardTanhSpike(SurrogateSpike):
         grad_input = grad_output.clone()
         beta = HardTanhSpike.beta
         grad = grad_input * (1.0 + torch.nn.functional.hardtanh(input * beta))
-        return grad
+        return grad * HardTanhSpike.gamma
 
 
 class SuperSpike_norm(SurrogateSpike):
@@ -384,6 +398,8 @@ class SuperSpike_norm(SurrogateSpike):
 
     beta = 100.0
     xi = 1e-2
+    gamma = 1.0  # gradient scale
+
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -413,7 +429,7 @@ class SuperSpike_norm(SurrogateSpike):
         standard_grad = grad / (
             SuperSpike_norm.xi + torch.norm(torch.mean(grad, dim=0))
         )
-        return standard_grad
+        return standard_grad * SuperSpike_norm.gamma
 
 
 def gaussian(x, mu=0.0, sigma=0.5):
