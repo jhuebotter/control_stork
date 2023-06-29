@@ -271,7 +271,7 @@ class SigmoidSpike(SurrogateSpike):
 
     beta = 100.0
     gamma = 1.0  # gradient scale
-
+    norm = 4.0  # normalization factor
 
     @staticmethod
     def forward(ctx, input: torch.Tensor) -> torch.Tensor:
@@ -298,7 +298,7 @@ class SigmoidSpike(SurrogateSpike):
         grad_input = grad_output.clone()
         sig = torch.sigmoid(SigmoidSpike.beta * input)
         dsig = sig * (1.0 - sig)
-        grad = grad_input * dsig
+        grad = grad_input * dsig * SigmoidSpike.norm
         return grad * SigmoidSpike.gamma
 
 
@@ -315,7 +315,7 @@ class EsserSpike(SurrogateSpike):
     The steepness parameter beta can be accessed via the static member self.beta (default=1.0).
     """
 
-    beta = 1.0
+    beta = 100.0
     gamma = 1.0  # gradient scale
 
 
@@ -446,10 +446,10 @@ class GaussianSpike(SurrogateSpike):
 
     """
 
-    gamma = 0.5  # gradient scale
-    lens = 0.3
+    gamma = 1.0  # gradient scale
     scale = 6.0
     hight = 0.15
+    beta = 100.0
 
     @staticmethod
     def forward(ctx, input):  # input = membrane potential- threshold
@@ -473,23 +473,30 @@ class GaussianSpike(SurrogateSpike):
         (input,) = ctx.saved_tensors
         grad_input = grad_output.clone()
 
+        lens = 1. / GaussianSpike.beta
+
         # temp =  gaussian(input, mu=0., sigma=GaussianSpike.lens)
         # temp = torch.exp(-(input**2)/(2*GaussianSpike.lens**2))/torch.sqrt(2*torch.tensor(math.pi))/GaussianSpike.lens
+        norm = gaussian(torch.zeros(1), mu=0., sigma=lens) * (1. + GaussianSpike.hight) \
+            - gaussian(torch.zeros(1), mu=lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight \
+            - gaussian(torch.zeros(1), mu=-lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight
 
         temp = (
-            gaussian(input, mu=0.0, sigma=GaussianSpike.lens)
+            gaussian(input, mu=0.0, sigma=lens)
             * (1.0 + GaussianSpike.hight)
             - gaussian(
                 input,
                 mu=GaussianSpike.lens,
-                sigma=GaussianSpike.scale * GaussianSpike.lens,
+                sigma=GaussianSpike.scale * lens,
             )
             * GaussianSpike.hight
             - gaussian(
                 input,
                 mu=-GaussianSpike.lens,
-                sigma=GaussianSpike.scale * GaussianSpike.lens,
+                sigma=GaussianSpike.scale * lens,
             )
             * GaussianSpike.hight
         )
+        temp = temp / norm
+
         return grad_input * temp.float() * GaussianSpike.gamma
