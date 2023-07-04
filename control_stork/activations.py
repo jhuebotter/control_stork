@@ -475,8 +475,8 @@ class GaussianSpike(SurrogateSpike):
 
         lens = 1. / GaussianSpike.beta
 
-        # temp =  gaussian(input, mu=0., sigma=GaussianSpike.lens)
-        # temp = torch.exp(-(input**2)/(2*GaussianSpike.lens**2))/torch.sqrt(2*torch.tensor(math.pi))/GaussianSpike.lens
+        # temp =  gaussian(input, mu=0., sigma=lens)
+        # temp = torch.exp(-(input**2)/(2*lens**2))/torch.sqrt(2*torch.tensor(math.pi))/lens
         norm = gaussian(torch.zeros(1), mu=0., sigma=lens) * (1. + GaussianSpike.hight) \
             - gaussian(torch.zeros(1), mu=lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight \
             - gaussian(torch.zeros(1), mu=-lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight
@@ -486,13 +486,13 @@ class GaussianSpike(SurrogateSpike):
             * (1.0 + GaussianSpike.hight)
             - gaussian(
                 input,
-                mu=GaussianSpike.lens,
+                mu=lens,
                 sigma=GaussianSpike.scale * lens,
             )
             * GaussianSpike.hight
             - gaussian(
                 input,
-                mu=-GaussianSpike.lens,
+                mu=-lens,
                 sigma=GaussianSpike.scale * lens,
             )
             * GaussianSpike.hight
