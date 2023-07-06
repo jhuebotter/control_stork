@@ -450,6 +450,7 @@ class GaussianSpike(SurrogateSpike):
     scale = 6.0
     hight = 0.15
     beta = 100.0
+    norm = None
 
     @staticmethod
     def forward(ctx, input):  # input = membrane potential- threshold
@@ -477,9 +478,13 @@ class GaussianSpike(SurrogateSpike):
 
         # temp =  gaussian(input, mu=0., sigma=lens)
         # temp = torch.exp(-(input**2)/(2*lens**2))/torch.sqrt(2*torch.tensor(math.pi))/lens
-        norm = gaussian(torch.zeros(1), mu=0., sigma=lens) * (1. + GaussianSpike.hight) \
-            - gaussian(torch.zeros(1), mu=lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight \
-            - gaussian(torch.zeros(1), mu=-lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight
+
+        if GaussianSpike.norm is None:
+            GaussianSpike.norm = (
+                gaussian(torch.zeros(1), mu=0., sigma=lens) * (1. + GaussianSpike.hight) \
+                - gaussian(torch.zeros(1), mu=lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight \
+                - gaussian(torch.zeros(1), mu=-lens, sigma=GaussianSpike.scale * lens) * GaussianSpike.hight
+            ).item()
 
         temp = (
             gaussian(input, mu=0.0, sigma=lens)
@@ -497,6 +502,6 @@ class GaussianSpike(SurrogateSpike):
             )
             * GaussianSpike.hight
         )
-        temp = temp / norm
+        temp = temp / GaussianSpike.norm
 
         return grad_input * temp.float() * GaussianSpike.gamma
