@@ -138,6 +138,43 @@ class SpikeCountMonitor(Monitor):
         if self.data is None:
             return None
         return self.data.cpu()
+    
+
+class ActiveNeuronMonitor(Monitor):
+    """Counts number of active neurons (more than n_min spikes) / number of all neurons
+
+    Args:
+        group: The group to record from
+        n_min: The minimum number of spikes to be considered active
+
+    Returns:
+        A float tensor with the fraction of active neurons for each input
+    """
+
+    def __init__(self, group: CellGroup, n_min: int = 1) -> None:
+        super().__init__()
+        self.group = group
+        self.n_min = n_min
+
+    def reset(self) -> None:
+        self.n = 0
+        self.data = None
+
+    def execute(self) -> None:
+        self.n += 1
+        spk = self.group.states["out"].detach().clone()
+        if self.data is None:
+            self.data = spk
+        else:
+            self.data += spk
+
+    def get_data(self) -> torch.Tensor:
+        if self.data is None:
+            return None
+        all = torch.sum(self.data, dim=0)
+        active = (all >= self.n_min).float()
+        ratio = torch.sum(active) / self.group.nb_units
+        return ratio.cpu()
 
 
 class PopulationSpikeCountMonitor(Monitor):
