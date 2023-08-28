@@ -5,7 +5,7 @@ class ActivityRegularizer:
     """Abstract base class for activity regularizers."""
 
     def __init__(
-        self, strength: float = 1.0, threshold: float = 0.0, dims: Optional[Union[int, tuple, list]] = -1
+        self, strength: float = 1.0, threshold: float = 0.0, dims: Optional[Union[int, tuple, list]] = -1, basis: str = "out"
     ) -> None:
         """Constructor
 
@@ -16,11 +16,13 @@ class ActivityRegularizer:
                                   Defaults to -1, which supports fully connected networks and 1D-Conv nets.
                                   For 2D-Conv nets, set to dims=(-2,-1) or dims=(3,4) (equivalent).
                                   To implement a per-neuron regularizer, set dims=None or 0 to average over the batch.
+            basis (str, optional): The basis to use for the regularizer. Defaults to "out".
         """
 
         self.strength = float(strength)
         self.threshold = float(threshold)
         self.dims = dims
+        self.basis = basis
 
         # Assert that dimensions is either False, int, tuple or list
         if self.dims is not None:
@@ -28,15 +30,20 @@ class ActivityRegularizer:
 
     def __call__(self, group) -> torch.Tensor:
         """Expects input with (batch x time x units)"""
-        act = group.get_out_sequence()  # get output
+        if self.basis not in group.store_state_sequences:
+            raise ValueError(
+                f"Regularizer basis {self.basis} not stored in group {group.name}."
+            )
+        act = group.get_state_sequence(self.basis)  # get sequence used for regularization
+        # act = group.get_out_sequence()  # get output
         # cnt = torch.sum(act, dim=1)  # get spikecount
-        cnt = torch.mean(act, dim=1)  # get average "firing rate"
+        avg = torch.mean(act, dim=1)  # get average "spike density"
 
         # if population-level regularizer, calculate mean across defined dims
         if self.dims is not None:
-            cnt = torch.mean(cnt, dim=self.dims)
+            avg = torch.mean(avg, dim=self.dims)
 
-        return self.calc_regloss(cnt)
+        return self.calc_regloss(avg)
 
     def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
         """
