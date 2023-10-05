@@ -12,5 +12,7 @@ from . import initializers
 from . import extratypes
 from . import models
 from . import plotting
+from . import loss_stacks
+from . import generators
 
 __version__ = "0.1.0"

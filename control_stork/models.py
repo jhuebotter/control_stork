@@ -6,6 +6,8 @@ import torch.nn as nn
 
 from . import monitors
 from .extratypes import *
+from . import generators
+from . import loss_stacks
 
 
 # TODO: completely rewrite this class
@@ -58,10 +60,22 @@ class RecurrentSpikingModel(nn.Module):
         optimizer: Optional[torch.optim.Optimizer] = None,
         optimizer_kwargs: Optional[dict] = None,
         time_step: float = 1e-3,
+        loss_stack=None,
+        generator=None,
     ):
         self.input_group = input
         self.output_group = output
         self.time_step = time_step
+
+        if loss_stack is not None:
+            self.loss_stack = loss_stack
+        else:
+            self.loss_stack = loss_stacks.MaxOverTimeCrossEntropy()
+
+        if generator is None:
+            self.data_generator_ = generators.StandardGenerator()
+        else:
+            self.data_generator_ = generator
 
         self.configure_objects()
 
@@ -76,6 +90,12 @@ class RecurrentSpikingModel(nn.Module):
         self.configure_optimizer(self.optimizer_class, self.optimizer_kwargs)
         self.to(self.device)
 
+    def prepare_data(self, dataset):
+        return self.data_generator_.prepare_data(dataset)
+
+    def data_generator(self, dataset, shuffle=True):
+        return self.data_generator_(dataset, shuffle=shuffle)
+    
     def configure_optimizer(self, optimizer_class, optimizer_kwargs):
         if optimizer_kwargs is not None:
             self.optimizer_instance = optimizer_class(
@@ -83,6 +103,9 @@ class RecurrentSpikingModel(nn.Module):
             )
         else:
             self.optimizer_instance = optimizer_class(self.parameters())
+
+    def set_loss_stack(self, loss_stack):
+        self.loss_stack = loss_stack
 
     def add_group(self, group):
         self.groups.append(group)
@@ -212,7 +235,8 @@ class RecurrentSpikingModel(nn.Module):
         self.prepare_data(dataset)
         metrics = []
         for local_X, local_y in self.data_generator(dataset, shuffle=shuffle):
-            output = self.forward(local_X, cur_batch_size=len(local_X))
+            self.reset_state(len(local_X))
+            output = self.forward(local_X)
             total_loss = self.get_total_loss(output, local_y)
 
             # store loss and other metrics
