@@ -148,11 +148,11 @@ class RecurrentSpikingModel(nn.Module):
         for m in self.monitors:
             m.execute()
 
-    def get_monitor_data(self, exclude: list = []) -> dict:
+    def get_monitor_data(self, exclude: Optional[list] = None) -> dict:
         data = {}
         for m in self.monitors:
             k = f"{m.__class__.__name__}"
-            if k in exclude:
+            if exclude is not None and k in exclude:
                 continue
             if hasattr(m, "group"):
                 k += f" on {m.group.name}"
@@ -475,7 +475,7 @@ class RecurrentSpikingModel(nn.Module):
             return results, test_scores, callback_returns
         else:
             return results, test_scores
-
+    
     def count_parameters(self):
         # TODO: check if this counts MaskedTensor parameters correctly
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

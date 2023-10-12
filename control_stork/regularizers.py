@@ -1,6 +1,7 @@
 import torch
 from .extratypes import *
 
+
 class ActivityRegularizer:
     """Abstract base class for activity regularizers."""
 

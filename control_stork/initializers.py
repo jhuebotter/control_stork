@@ -241,7 +241,7 @@ class KaimingNormalInitializer(Initializer):
 
 
 class ConstantInitializer(Initializer):
-    def __init__(self, value: Union[float, torch.Tensor], **kwargs):
+    def __init__(self, value: Union[float, torch.Tensor] = 0.0, **kwargs):
         super().__init__(**kwargs)
 
         self.value = value

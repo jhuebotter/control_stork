@@ -42,6 +42,8 @@ class BaseConnection(core.NetworkNode):
         self.src = src
         self.dst = dst
 
+        self.recurrent = src == dst
+
         if target is None:
             self.target = dst.default_target
         else:
@@ -172,6 +174,8 @@ class BottleneckLinearConnection(BaseConnection):
         self.propagate_gradients = propagate_gradients
         self.flatten_input = flatten_input
         self.n_dims = n_dims
+
+        # TODO: ideally combine pre_op and op into one layer
 
         self.pre_op = nn.Linear(
             src.nb_units if flatten_input else src.shape[0],
