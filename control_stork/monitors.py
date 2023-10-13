@@ -183,6 +183,7 @@ class PopulationSpikeCountMonitor(Monitor):
     Args:
         group: The group to record from
         per_example: If True, returns the mean spike count per example
+        avg: If True, returns the mean spike count over time (spike density)
 
     Returns:
         A tensor with spike counts for each input and neuron

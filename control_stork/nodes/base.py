@@ -23,6 +23,7 @@ class CellGroup(core.NetworkNode):
         regularizers: Optional[Iterable] = None,
         dropout_p: float = 0.0,
         stateful: bool = False,
+        spiking: bool = False,
         **kwargs
     ) -> None:
         super(CellGroup, self).__init__(name, regularizers)
@@ -45,6 +46,7 @@ class CellGroup(core.NetworkNode):
         else:
             self.dropout = None
         self.clk = 0
+        self.spiking = spiking
 
     def configure(
         self, time_step: float, device: torch.device, dtype: torch.dtype

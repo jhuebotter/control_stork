@@ -62,6 +62,7 @@ class LIFGroup(CellGroup):
             stateful=stateful,
             name=name,
             regularizers=regularizers,
+            spiking=True,
             **kwargs
         )
         self.tau_mem = tau_mem
