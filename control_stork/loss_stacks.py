@@ -111,6 +111,10 @@ class MaxOverTimeFocalLoss(LossStack):
 
     def get_metric_names(self):
         return ["acc"]
+    
+    def get_acc(self, data, target_labels):
+        log_py_x = self.log_py_given_x(data)
+        return self.acc_fn(log_py_x, target_labels)
 
     def compute_loss(self, output, targets):
         # reduce along time with max

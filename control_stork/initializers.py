@@ -330,8 +330,9 @@ class FluctuationDrivenNormalInitializer(Initializer):
         alpha=0.9,
         **kwargs
     ):
+        # ! commented out the scaling = None as I want to be able to set weights to 0 without changing the initializer.
         super().__init__(
-            scaling=None,  # None, as scaling is implemented in the weight sampling
+            #scaling=None,  # None, as scaling is implemented in the weight sampling
             **kwargs
         )
 
