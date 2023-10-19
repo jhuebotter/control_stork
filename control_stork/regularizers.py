@@ -29,7 +29,7 @@ class ActivityRegularizer:
         if self.dims is not None:
             assert isinstance(self.dims, (int, tuple, list))
 
-    def __call__(self, group) -> torch.Tensor:
+    def __call__(self, group, reduction: str = "mean") -> torch.Tensor:
         """Expects input with (batch x time x units)"""
         if self.basis not in group.store_state_sequences:
             raise ValueError(
@@ -44,9 +44,9 @@ class ActivityRegularizer:
         if self.dims is not None:
             avg = torch.mean(avg, dim=self.dims)
 
-        return self.calc_regloss(avg)
+        return self.calc_regloss(avg, reduction=reduction)
 
-    def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         """
         Args: cnt:    Spikecount
         """
@@ -56,75 +56,146 @@ class ActivityRegularizer:
 class ActivityRegularizerL1(ActivityRegularizer):
     """Penalizes activity above and below threshold"""
 
-    def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         reg = cnt - self.threshold
-        reg_loss = self.strength * torch.mean(torch.abs(reg))
-        return reg_loss
+        reg = torch.abs(reg)
+        if reduction == "mean":
+            reg_loss = torch.mean(reg)
+        elif reduction == "sum":
+            reg_loss = torch.sum(reg)
+        elif reduction == "none":
+            # this will return a loss per batch element
+            reg_loss = reg.view(reg.size(0), -1).mean(dim=1)
+        return self.strength * reg_loss
+
+
+class ActivityRegularizerL2(ActivityRegularizer):
+    """Penalizes square of activity above and below threshold"""
+
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
+        reg = cnt - self.threshold
+        reg = torch.square(reg)
+        if reduction == "mean":
+            reg_loss = torch.mean(reg)
+        elif reduction == "sum":
+            reg_loss = torch.sum(reg)
+        elif reduction == "none":
+            # this will return a loss per batch element
+            reg_loss = reg.view(reg.size(0), -1).mean(dim=1)
+        return self.strength * reg_loss
 
 
 class UpperBoundL1(ActivityRegularizer):
     """Provides an upper bound L1 regularizer on the spike count"""
 
-    def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         reg = torch.relu(cnt - self.threshold)
-        reg_loss = self.strength * torch.mean(torch.abs(reg))
-        return reg_loss
+        reg = torch.abs(reg)
+        if reduction == "mean":
+            reg_loss = torch.mean(reg)
+        elif reduction == "sum":
+            reg_loss = torch.sum(reg)
+        elif reduction == "none":
+            # this will return a loss per batch element
+            reg_loss = reg.view(reg.size(0), -1).mean(dim=1)
+        return self.strength * reg_loss
 
 
 class LowerBoundL1(ActivityRegularizer):
     """Provides a lower bound L1 regularizer on the spike count"""
 
-    def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         reg = torch.relu(-(cnt - self.threshold))
-        reg_loss = self.strength * torch.mean(torch.abs(reg))
-        return reg_loss
+        reg = torch.abs(reg)
+        if reduction == "mean":
+            reg_loss = torch.mean(reg)
+        elif reduction == "sum":
+            reg_loss = torch.sum(reg)
+        elif reduction == "none":
+            # this will return a loss per batch element
+            reg_loss = reg.view(reg.size(0), -1).mean(dim=1)
+        return self.strength * reg_loss
 
 
 class UpperBoundL2(ActivityRegularizer):
     """Provides an upper bound L2 regularizer on the spike count"""
 
-    def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         reg = torch.relu(cnt - self.threshold)
-        reg_loss = self.strength * torch.mean(torch.square(reg))
-        return reg_loss
+        reg = torch.square(reg)
+        if reduction == "mean":
+            reg_loss = torch.mean(reg)
+        elif reduction == "sum":
+            reg_loss = torch.sum(reg)
+        elif reduction == "none":
+            # this will return a loss per batch element
+            reg_loss = reg.view(reg.size(0), -1).mean(dim=1)
+        return self.strength * reg_loss
 
 
 class LowerBoundL2(ActivityRegularizer):
     """Provides a lower bound L2 regularizer on the spike count"""
 
-    def calc_regloss(self, cnt: torch.Tensor) -> torch.Tensor:
+    def calc_regloss(self, cnt: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         reg = torch.relu(-(cnt - self.threshold))
-        reg_loss = self.strength * torch.mean(torch.square(reg))
-        return reg_loss
+        reg = torch.square(reg)
+        if reduction == "mean":
+            reg_loss = torch.mean(reg)
+        elif reduction == "sum":
+            reg_loss = torch.sum(reg)
+        elif reduction == "none":
+            # this will return a loss per batch element
+            reg_loss = reg.view(reg.size(0), -1).mean(dim=1)
+        return self.strength * reg_loss
 
 
-class WeightL2Regularizer:
-    """A mean square target rate regularizer"""
+class WeightRegularizer:
+    """Abstract base class for weight regularizers."""
 
     def __init__(self, strength: float = 1.0) -> None:
         """Constructor
 
         Args:
-            strength: regularizer strengh
+            strength: regularizer strength
         """
         self.strength = float(strength)
 
-    def __call__(self, w: torch.Tensor) -> torch.Tensor:
+    def __call__(self, w: torch.Tensor, reduction="mean") -> torch.Tensor:
         """Expects input with weights (channels x stuff)"""
-        return self.strength * torch.mean(w**2)
+        raise NotImplementedError("Abstract base class.")
 
 
-class WeightL1Regularizer:
+class WeightL2Regularizer(WeightRegularizer):
     """A mean square target rate regularizer"""
 
-    def __init__(self, strength: float = 1.0):
-        """Constructor
-
-        Args:
-            strength: regularizer strengh
-        """
-        self.strength = float(strength)
-
-    def __call__(self, w: torch.Tensor) -> torch.Tensor:
+    def __call__(self, w: torch.Tensor, reduction="mean") -> torch.Tensor:
         """Expects input with weights (channels x stuff)"""
-        return self.strength * torch.mean(torch.abs(w))
+        if reduction == "mean":
+            return self.strength * torch.mean(w.square())
+        elif reduction == "sum":
+            return self.strength * torch.sum(w.square())
+        elif reduction == "none":
+            # this will return a loss per weight element
+            return self.strength * (w.square())
+        
+    def grad(self, w: torch.Tensor) -> torch.Tensor:
+        """Expects input with weights (channels x stuff)"""
+        return self.strength * 2 * w
+
+
+class WeightL1Regularizer(WeightRegularizer):
+    """A mean square target rate regularizer"""
+
+    def __call__(self, w: torch.Tensor, reduction="mean") -> torch.Tensor:
+        """Expects input with weights (channels x stuff)"""
+        if reduction == "mean":
+            return self.strength * torch.mean(w.abs())
+        elif reduction == "sum":
+            return self.strength * torch.sum(w.abs())
+        elif reduction == "none":
+            # this will return a loss per weight element
+            return self.strength * (w.abs())
+        
+    def grad(self, w: torch.Tensor) -> torch.Tensor:
+        """Expects input with weights (channels x stuff)"""
+        return self.strength * torch.sign(w)

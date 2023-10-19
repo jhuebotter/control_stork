@@ -54,10 +54,10 @@ class CellGroup(core.NetworkNode):
         super().configure(time_step, device, dtype)
         self.reset_state()
 
-    def get_regularizer_loss(self) -> torch.Tensor:
+    def get_regularizer_loss(self, reduction="mean") -> torch.Tensor:
         reg_loss = torch.tensor(0.0, device=self.device)
         for reg in self.regularizers:
-            reg_loss += reg(self)
+            reg_loss = reg_loss + reg(self, reduction=reduction)
         return reg_loss
 
     def set_state_tensor(self, key: str, state: torch.Tensor) -> None:

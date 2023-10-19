@@ -54,7 +54,7 @@ class ReadoutGroup(CellGroup):
         new_syn = self.dcy_syn * self.syn + self.input
         new_mem = self.dcy_mem * self.out + self.scl_mem * self.syn
 
-        self.out = self.states["out"] = self.states["mem"] = new_mem
+        self.out = self.states["out"] = self.mem = self.states["mem"] = new_mem
         self.syn = self.states["syn"] = new_syn
 
 
@@ -88,7 +88,7 @@ class FastReadoutGroup(ReadoutGroup):
         new_syn = self.dcy_syn * self.syn + self.input
         new_mem = self.dcy_mem * self.out + self.scl_mem * new_syn
 
-        self.out = self.states["out"] = new_mem
+        self.out = self.states["out"] = self.mem = self.states["mem"] = new_mem
         self.syn = self.states["syn"] = new_syn
 
 
@@ -121,7 +121,7 @@ class DirectReadoutGroup(CellGroup):
         self.out = self.get_state_tensor("out", state=self.out, init=self.initial_state)
 
     def forward(self) -> None:
-        self.out = self.states["out"] = self.input * self.weight_scale
+                self.out = self.states["out"] = self.mem = self.states["mem"] = self.input * self.weight_scale
 
 
 class TimeAverageReadoutGroup(CellGroup):
@@ -158,4 +158,4 @@ class TimeAverageReadoutGroup(CellGroup):
     def forward(self) -> None:
         self.memory.pop(0)
         self.memory.append(self.input * self.weight_scale)
-        self.out = self.states["out"] = torch.mean(torch.stack(self.memory), dim=0)
+        self.out = self.states["out"] = self.mem = self.states["mem"] = torch.mean(torch.stack(self.memory), dim=0)

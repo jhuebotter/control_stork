@@ -160,13 +160,23 @@ class RecurrentSpikingModel(nn.Module):
                 k += f" for {m.key}"
             data[k] = m.get_data()
         return data
+    
+    def compute_activity_regularizer_losses(self, reduction="mean"):
+        reg_loss = torch.zeros(1, device=self.device)
+        for g in self.groups:
+            reg_loss = reg_loss + g.get_regularizer_loss(reduction=reduction)
+        return reg_loss
+    
+    def compute_weight_regularizer_losses(self):
+        reg_loss = torch.zeros(1, device=self.device)
+        for c in self.connections:
+            reg_loss = reg_loss + c.get_regularizer_loss()
+        return reg_loss
 
     def compute_regularizer_losses(self):
         reg_loss = torch.zeros(1, device=self.device)
-        for g in self.groups:
-            reg_loss += g.get_regularizer_loss()
-        for c in self.connections:
-            reg_loss += c.get_regularizer_loss()
+        reg_loss = reg_loss + self.compute_activity_regularizer_losses()
+        reg_loss = reg_loss + self.compute_weight_regularizer_losses()
         return reg_loss
 
     def remove_regularizers(self):

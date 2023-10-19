@@ -119,11 +119,46 @@ class Connection(BaseConnection):
 
     def get_weights(self) -> torch.Tensor:
         return self.op.weight
+    
+    def get_bias(self) -> torch.Tensor:
+        return self.op.bias
+    
+    def get_weight_regularizer_loss(self, reduction="mean") -> torch.Tensor:
+        reg_loss = torch.tensor(0.0, device=self.device)
+        for reg in self.regularizers:
+            reg_loss = reg_loss + reg(self.get_weights(), reduction=reduction)
+        return reg_loss
+    
+    def get_bias_regularizer_loss(self, reduction="mean") -> torch.Tensor:
+        reg_loss = torch.tensor(0.0, device=self.device)
+        bias = self.get_bias()
+        if bias is not None:
+            for reg in self.regularizers:
+                reg_loss = reg_loss + reg(bias, reduction=reduction)
+        return reg_loss
+    
+    def get_weight_regularizer_grad(self) -> torch.Tensor:
+        reg_grad = torch.tensor(0.0, device=self.device)
+        for reg in self.regularizers:
+            reg_grad = reg_grad + reg.grad(self.get_weights())
+        return reg_grad
+    
+    def get_bias_regularizer_grad(self) -> torch.Tensor:
+        reg_grad = torch.tensor(0.0, device=self.device)
+        bias = self.get_bias()
+        if bias is not None:
+            for reg in self.regularizers:
+                reg_grad = reg_grad + reg.grad(bias)
+        return reg_grad
 
     def get_regularizer_loss(self) -> torch.Tensor:
+        """this always uses mean reduction so it can be added to other losses"""
         reg_loss = torch.tensor(0.0, device=self.device)
         for reg in self.regularizers:
             reg_loss += reg(self.get_weights())
+            bias = self.get_bias()
+            if bias is not None:
+                reg_loss = reg_loss + reg(bias)
         return reg_loss
 
     def forward(self) -> None:
@@ -199,14 +234,19 @@ class BottleneckLinearConnection(BaseConnection):
             A[i] = ampl * np.exp(-((x - i) ** 2) / width**2)
         self.op.weight.data += torch.from_numpy(A)
 
-    def get_weights(self) -> torch.Tensor:
-        return self.op.weight
+    def get_weights(self) -> (torch.Tensor, torch.Tensor):
+        return self.pre_op.weight, self.op.weight
+    
+    def get_bias(self) -> (torch.Tensor, torch.Tensor):
+        return self.pre_op.bias, self.op.bias
 
     def get_regularizer_loss(self) -> torch.Tensor:
         reg_loss = torch.tensor(0.0, device=self.device)
         for reg in self.regularizers:
-            for l in self.op:
+            for l in [self.op, self.pre_op]:
                 reg_loss += reg(l.weight)
+                if l.bias is not None:
+                    reg_loss += reg(l.bias)
         return reg_loss
 
     def forward(self) -> None:
