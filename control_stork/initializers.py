@@ -41,8 +41,8 @@ def _epsilon_analytical(tau_mem, tau_syn):
 
 def _epsilon_numerical(tau_mem, tau_syn, time_step: float):
     kernel = get_lif_kernel(tau_mem, tau_syn, time_step)
-    epsilon_bar = kernel.sum() * time_step
-    epsilon_hat = (kernel**2).sum() * time_step
+    epsilon_bar = kernel.sum(axis=-1) * time_step
+    epsilon_hat = (kernel**2).sum(axis=-1) * time_step
 
     return epsilon_bar, epsilon_hat
 
@@ -332,7 +332,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
     ):
         # ! commented out the scaling = None as I want to be able to set weights to 0 without changing the initializer.
         super().__init__(
-            #scaling=None,  # None, as scaling is implemented in the weight sampling
+            # scaling=None,  # None, as scaling is implemented in the weight sampling
             **kwargs
         )
 
@@ -343,7 +343,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
         self.epsilon_calc_mode = epsilon_calc_mode
         self.alpha = alpha
 
-    def _calc_epsilon(self, dst):
+    def _calc_epsilon_old(self, dst):
         """
         Calculates epsilon_bar and epsilon_hat, the integrals of the PSP kernel from a target
         neuron group `dst`
@@ -354,11 +354,43 @@ class FluctuationDrivenNormalInitializer(Initializer):
 
         return ebar, ehat
 
+    def _calc_epsilon(self, dst):
+        """
+        Calculates epsilon_bar and epsilon_hat, the integrals of the PSP kernel from a target
+        neuron group `dst`
+        """
+        tau_mem = dst.tau_mem
+        tau_syn = dst.tau_syn
+
+        if not torch.is_tensor(tau_mem):
+            tau_mem = torch.Tensor([tau_mem])
+        if not torch.is_tensor(tau_syn):
+            tau_syn = torch.Tensor([tau_syn])
+
+        ebar, ehat = _get_epsilon(
+            self.epsilon_calc_mode,
+            tau_mem.detach().cpu(),
+            tau_syn.detach().cpu(),
+            self.time_step,
+        )
+
+        return ebar, ehat
+
     def _get_weights(self, connection, mu_w, sigma_w):
         shape = connection.op.weight.shape
 
-        # sample weights
-        weights = dists.Normal(mu_w, sigma_w).sample(shape)
+        mu_w = mu_w.to(connection.op.weight.device)
+        sigma_w = sigma_w.to(connection.op.weight.device)
+
+        assert mu_w.shape == sigma_w.shape, "mu_w and sigma_w must have the same shape"
+        assert len(mu_w.shape) == 1, "mu_w must be 1D"
+        if mu_w.shape[0] != 1:
+            # Weights are defined as output x input
+            # The mu_w shape (and sigma_W) should be output shaped
+            assert mu_w.shape[0] == shape[0], "mu_w shape does not match output shape"
+            weights = dists.Normal(mu_w, sigma_w).sample(shape[1:]).swapaxes(0, -1)
+        else:
+            weights = dists.Normal(mu_w[0], sigma_w[0]).sample(shape)
 
         return weights
 
@@ -374,7 +406,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
         ebar, ehat = self._calc_epsilon(connection.dst)
 
         mu_w = self.mu_u / (n * self.nu * ebar)
-        sigma_w = math.sqrt(
+        sigma_w = torch.sqrt(
             1 / (n * self.nu * ehat) * ((theta - self.mu_u) / self.xi) ** 2 - mu_w**2
         )
 
@@ -440,7 +472,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
                 scale = alpha / nb_ff
 
             # sigma_w for this connection
-            sigma_w = math.sqrt(
+            sigma_w = torch.sqrt(
                 scale / (N * self.nu * ehat) * ((theta - self.mu_u) / self.xi) ** 2
                 - mu_w**2
             )
@@ -610,10 +642,7 @@ class FluctuationDrivenExponentialInitializer(FluctuationDrivenNormalInitializer
                 * np.sqrt(
                     delta_EI**2 * ehat_exc * N_total_exc_rec
                     + delta_REC**2
-                    * (
-                        N_total_exc_ff * delta_EI**2 * ehat_exc
-                        + ehat_inh * N_total_inh
-                    )
+                    * (N_total_exc_ff * delta_EI**2 * ehat_exc + ehat_inh * N_total_inh)
                 )
                 / (theta * delta_EI * delta_REC)
             )

@@ -5,6 +5,7 @@ import string
 import random
 import time
 import numpy as np
+from typing import Union
 
 
 def get_random_string(string_length: int = 5) -> str:
@@ -87,35 +88,42 @@ def to_sparse(x: torch.Tensor) -> torch.Tensor:
 
 
 def get_lif_kernel(
-    tau_mem: float = 20e-3, tau_syn: float = 10e-3, dt: float = 1e-3
-) -> np.ndarray:
+    tau_mem: Union[float, torch.Tensor] = 20e-3,
+    tau_syn: Union[float, torch.Tensor] = 10e-3,
+    dt: float = 1e-3,
+) -> torch.Tensor:
     """Computes the linear filter kernel of a simple LIF neuron with exponential current-based synapses.
 
     Args:
-        tau_mem: The membrane time constant
-        tau_syn: The synaptic time constant
+        tau_mem: The membrane time constant(s)
+        tau_syn: The synaptic time constant(s)
         dt: The time_step size
 
     Returns:
-        Array of length 10x of the longest time constant containing the filter kernel
+        Tensor of length 10x of the longest time constant containing the filter kernel (dim, t)
 
     """
-    tau_max = np.max((tau_mem, tau_syn))
-    T_max = np.max((int(tau_max * 10 / dt), 1))
-    # ts = np.arange(0, int(tau_max * 10 / dt)) * dt
-    ts = np.arange(0, T_max) * dt
+    if not torch.is_tensor(tau_mem):
+        tau_mem = torch.Tensor([tau_mem])
+    if not torch.is_tensor(tau_syn):
+        tau_syn = torch.Tensor([tau_syn])
+    mem_max = torch.max(tau_mem)
+    syn_max = torch.max(tau_syn)
+    tau_max = torch.max(torch.tensor([mem_max, syn_max]))
+    T_max = int(tau_max * 10 / dt)
+    ts = np.arange(0, T_max + 1) * dt
     n = len(ts)
-    n = len(ts)
-    kernel = np.empty(n)
+    kernel = []
     I = 1.0  # Initialize current variable for single spike input
     U = 0.0
-    dcy1 = torch.exp(-dt / torch.tensor(tau_mem))
-    dcy2 = torch.exp(-dt / torch.tensor(tau_syn))
+    dcy1 = torch.exp(-dt / tau_mem)
+    dcy2 = torch.exp(-dt / tau_syn)
     for i, t in enumerate(ts):
-        kernel[i] = U
         U = dcy1 * U + (1.0 - dcy1) * I
         I *= dcy2
-    return kernel
+        kernel.append(U)
+    k = torch.stack(kernel, axis=-1)
+    return k
 
 
 def convlayer_size(
