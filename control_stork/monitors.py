@@ -138,7 +138,7 @@ class SpikeCountMonitor(Monitor):
         if self.data is None:
             return None
         return self.data.cpu()
-    
+
 
 class ActiveNeuronMonitor(Monitor):
     """Counts number of active neurons (more than n_min spikes) / number of all neurons
@@ -276,6 +276,37 @@ class MeanVarianceMonitor(Monitor):
         mean = self.s / self.c
         var = self.s2 / self.c - mean**2
         return torch.stack((mean, var), len(mean.shape)).cpu()
+
+
+class PropertyMonitor(Monitor):
+    """Records a property of a group over time
+
+    Args:
+        group: The group to record from
+        key: The name of the property
+        dtype: The type of the property
+    """
+
+    def __init__(self, group: CellGroup, key: str, dtype=None) -> None:
+        super().__init__()
+        self.group = group
+        self.key = key
+        self.dtype = dtype
+        self.data = None
+
+    def reset(self) -> None:
+        self.data = None
+
+    def execute(self) -> None:
+        att = getattr(self.group, self.key)
+        if torch.is_tensor(att):
+            att = att.detach().cpu()
+        if self.dtype is not None:
+            att = self.dtype(att)
+        self.data = att
+
+    def get_data(self) -> torch.Tensor:
+        return self.data
 
 
 class GradientMonitor(Monitor):
