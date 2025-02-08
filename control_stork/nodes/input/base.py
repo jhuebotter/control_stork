@@ -12,10 +12,19 @@ class InputGroup(CellGroup):
         shape: Union[int, Iterable],
         name: str = "Input",
         scaling: float = 1.0,
+        learn_scaling: bool = False,
         **kwargs
     ) -> None:
-        self.scaling = scaling
         super(InputGroup, self).__init__(shape, name=name, **kwargs)
+        log_scaling = torch.log(torch.tensor(scaling, dtype=torch.float32))
+        if learn_scaling:
+            self.log_scaling = torch.nn.Parameter(
+                torch.tensor(log_scaling, dtype=torch.float32)
+            )
+        else:
+            self.register_buffer(
+                "log_scaling", torch.tensor(log_scaling, dtype=torch.float32)
+            )
 
     def reset_state(self, batch_size: Optional[int] = 1) -> None:
         super().reset_state(batch_size)
@@ -31,3 +40,8 @@ class InputGroup(CellGroup):
 
         self.out = self.states["out"] = self.local_data[:, self.counter] * self.scaling
         self.counter += 1
+
+    # define a property for scaling
+    @property
+    def scaling(self) -> torch.Tensor:
+        return torch.exp(self.log_scaling)

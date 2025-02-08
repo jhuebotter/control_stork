@@ -487,31 +487,37 @@ class RecurrentSpikingModel(nn.Module):
             return results, test_scores
     
     def count_parameters(self):
-        # TODO: check if this counts MaskedTensor parameters correctly
+        """Returns total number of trainable parameters."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def summary(self):
-        """Print model summary"""
+        """Prints a detailed model summary including trainable parameters."""
 
-        print("\n# Model summary")
+        print("\n# Model Summary")
+        
+        # Print group details
         print("\n## Groups")
         for group in self.groups:
-            if group.name is None or group.name == "":
-                print("no name, %s" % (group.shape,))
-            else:
-                print("%s, %s" % (group.name, group.shape))
+            group_name = group.name if group.name else "no name"
+            print(f"{group_name}, {group.shape}")
 
+        # Print connections
         print("\n## Connections")
         for con in self.connections:
             print(con)
 
+        # Print detailed parameter summary
         print("\n## Trainable Parameters")
+        
+        # Iterate over named parameters and print only those that require grad
+        param_count = 0
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                print(f"{name}: {param.numel()}")
+                param_count += 1
 
-        print("Total number of trainable parameters: %i" % self.count_parameters())
-        print(
-            "Number of parameter objects:",
-            len([p for p in self.parameters() if p.requires_grad]),
-        )
+        print("\nTotal number of trainable parameters:", self.count_parameters())
+        print("Number of trainable parameter objects:", param_count)
 
     def __str__(self):
         self.summary()

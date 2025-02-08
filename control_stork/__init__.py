@@ -14,5 +14,6 @@ from . import models
 from . import plotting
 from . import loss_stacks
 from . import generators
+from . import encoders
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

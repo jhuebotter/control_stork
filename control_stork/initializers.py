@@ -265,7 +265,7 @@ class ConstantInitializer(Initializer):
 
 class AverageInitializer(Initializer):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(scaling=None, **kwargs)
 
     def _get_weights(self, connection):
         fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(
@@ -283,6 +283,10 @@ class AverageInitializer(Initializer):
             .expand(shape)
             .to(connection.op.weight.device)
         )
+
+        # Compute the correction factor to preserve variance
+        correction_factor = torch.sqrt(torch.tensor(factor, dtype=torch.float32))
+        weights *= correction_factor
 
         return weights
 
