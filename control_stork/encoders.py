@@ -228,7 +228,7 @@ class LinearEncoder(torch.nn.Module):
         return input_shape * 2
 
 
-class Linear4DEncoder(nn.Module):
+class Linear4DEncoder(torch.nn.Module):
     """
     A linear encoder that maps each input value x (assumed to be in some range, e.g. [-1,1])
     to four outputs via:
@@ -260,8 +260,8 @@ class Linear4DEncoder(nn.Module):
 
         if learn_params:
             # Store parameters in log-domain for stability.
-            self.log_a = nn.Parameter(torch.log(torch.tensor(a, dtype=torch.float32)))
-            self.log_b = nn.Parameter(torch.log(torch.tensor(b, dtype=torch.float32)))
+            self.log_a = torch.nn.Parameter(torch.log(torch.tensor(a, dtype=torch.float32)))
+            self.log_b = torch.nn.Parameter(torch.log(torch.tensor(b, dtype=torch.float32)))
         else:
             # Precompute and store a and b as buffers (or fixed attributes) to save compute.
             self.register_buffer("a_val", torch.tensor(a, dtype=torch.float32))
