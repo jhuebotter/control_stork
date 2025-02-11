@@ -176,3 +176,143 @@ class RBFEncoder(torch.nn.Module):
             int: The size of the output tensor
         """
         return input_shape * self.num_centers
+
+
+class LinearEncoder(torch.nn.Module):
+    """
+    Encode input data using a linear transformation.
+
+    Given an input tensor of shape (batch_size, time_points, data_dims) with values
+    assumed to be normalized in the range [-1, 1], this encoder computes two encodings
+    for each input element:
+
+        y1 = 0.5 * x + 0.5
+        y2 = -0.5 * x + 0.5
+
+    The two outputs are concatenated along the last dimension, yielding an output tensor
+    of shape:
+
+        (batch_size, time_points, data_dims * 2)
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass: compute the two linear encodings and concatenate them.
+
+        Args:
+            data (torch.Tensor): Input tensor of shape (batch_size, time_points, data_dims).
+
+        Returns:
+            torch.Tensor: Encoded tensor of shape (batch_size, time_points, data_dims * 2).
+        """
+        # Compute the two encodings.
+        y1 = 0.5 * data + 0.5
+        y2 = -0.5 * data + 0.5
+        # Concatenate along the last dimension.
+        output = torch.cat([y1, y2], dim=-1)
+        return output
+
+    def compute_output_shape(self, input_shape: int) -> int:
+        """
+        Given the data dimension of the input tensor, compute the output dimension after encoding.
+
+        Args:
+            input_shape (int): The data dimension of the input tensor.
+
+        Returns:
+            int: The data dimension of the encoded tensor.
+        """
+        return input_shape * 2
+
+
+class Linear4DEncoder(nn.Module):
+    """
+    A linear encoder that maps each input value x (assumed to be in some range, e.g. [-1,1])
+    to four outputs via:
+
+        y1 = a*x + b,
+        y2 = a*x - b,
+        y3 = -a*x + b,
+        y4 = -a*x - b.
+
+    Optionally, the four outputs are normalized so that the resulting 4D vector has unit L2 norm.
+
+    Parameters:
+      - a (float): scaling factor (default 0.5)
+      - b (float): offset (default 0.5)
+      - learn_params (bool): if True, a and b are learnable parameters stored in log-scale.
+      - normalize (bool): if True, normalize the 4D output for each input element.
+    """
+
+    def __init__(
+        self,
+        a: float = 0.5,
+        b: float = 0.5,
+        learn_params: bool = False,
+        normalize: bool = False,
+    ) -> None:
+        super().__init__()
+        self.normalize = normalize
+        self.learn_params = learn_params
+
+        if learn_params:
+            # Store parameters in log-domain for stability.
+            self.log_a = nn.Parameter(torch.log(torch.tensor(a, dtype=torch.float32)))
+            self.log_b = nn.Parameter(torch.log(torch.tensor(b, dtype=torch.float32)))
+        else:
+            # Precompute and store a and b as buffers (or fixed attributes) to save compute.
+            self.register_buffer("a_val", torch.tensor(a, dtype=torch.float32))
+            self.register_buffer("b_val", torch.tensor(b, dtype=torch.float32))
+
+    @property
+    def a(self) -> torch.Tensor:
+        if self.learn_params:
+            return torch.exp(self.log_a)
+        else:
+            return self.a_val
+
+    @property
+    def b(self) -> torch.Tensor:
+        if self.learn_params:
+            return torch.exp(self.log_b)
+        else:
+            return self.b_val
+
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass.
+
+        Args:
+          data (torch.Tensor): Input tensor of shape (batch_size, time_points, data_dims)
+
+        Returns:
+          torch.Tensor: Encoded tensor of shape (batch_size, time_points, data_dims * 4)
+        """
+        # Compute the four linear projections.
+        y1 = self.a * data + self.b
+        y2 = self.a * data - self.b
+        y3 = -self.a * data + self.b
+        y4 = -self.a * data - self.b
+
+        # Stack along a new last dimension; shape becomes (batch_size, time_points, data_dims, 4)
+        out = torch.stack([y1, y2, y3, y4], dim=-1)
+
+        # Optionally normalize the 4D output along the last dimension.
+        if self.normalize:
+            norm = torch.norm(out, dim=-1, keepdim=True)
+            out = out / (norm + 1e-8)
+
+        # Flatten the last two dimensions so that the output shape becomes
+        # (batch_size, time_points, data_dims * 4)
+        batch_size, time_points, data_dims, _ = out.shape
+        out = out.view(batch_size, time_points, data_dims * 4)
+        return out
+
+    def compute_output_shape(self, input_shape: int) -> int:
+        """
+        Given the input feature dimension, returns the output feature dimension.
+        """
+        return input_shape * 4
