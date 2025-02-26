@@ -187,6 +187,7 @@ class BottleneckLinearConnection(BaseConnection):
         dst,  #: nodes.CellGroup,
         target: Optional[str] = None,
         bias: bool = False,
+        latent_bias: bool = False,
         n_dims: int = 1,
         requires_grad: bool = True,
         propagate_gradients: bool = True,
@@ -215,7 +216,7 @@ class BottleneckLinearConnection(BaseConnection):
         self.pre_op = nn.Linear(
             src.nb_units if flatten_input else src.shape[0],
             self.n_dims,
-            bias=bias,
+            bias=latent_bias,
             **kwargs
         )
         self.op = nn.Linear(self.n_dims, dst.shape[0], bias=bias, **kwargs)
