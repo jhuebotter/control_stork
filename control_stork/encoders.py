@@ -45,12 +45,15 @@ class EncoderStack(BaseEncoder):
     by sequentially applying each encoder's compute_output_shape.
     """
 
-    def __init__(self, encoders: list):
+    def __init__(self, encoders: list = []) -> None:
         """
         Args:
             encoders (list): A list of encoder objects (instances of subclasses of BaseEncoder).
         """
         super().__init__()
+        # If the list is empty, create an IdentityEncoder as a placeholder.
+        if not encoders:
+            encoders = [IdentityEncoder()]
         # Wrap the list of encoders in a ModuleList to ensure proper registration.
         self.encoders = torch.nn.ModuleList(encoders)
 
@@ -337,3 +340,19 @@ class DeltaEncoder(BaseEncoder):
 
     def compute_output_shape(self, input_shape: int) -> int:
         return input_shape * 2
+
+
+class IdentityEncoder(BaseEncoder):
+    """
+    Identity encoder that simply returns the input data unchanged.
+    This is useful for testing and as a placeholder for encoders that do not modify the input.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
+        return data
+
+    def compute_output_shape(self, input_shape: int) -> int:
+        return input_shape
