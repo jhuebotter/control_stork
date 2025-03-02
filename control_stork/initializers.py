@@ -347,17 +347,6 @@ class FluctuationDrivenNormalInitializer(Initializer):
         self.epsilon_calc_mode = epsilon_calc_mode
         self.alpha = alpha
 
-    def _calc_epsilon_old(self, dst):
-        """
-        Calculates epsilon_bar and epsilon_hat, the integrals of the PSP kernel from a target
-        neuron group `dst`
-        """
-        ebar, ehat = _get_epsilon(
-            self.epsilon_calc_mode, dst.tau_mem, dst.tau_syn, self.time_step
-        )
-
-        return ebar, ehat
-
     def _calc_epsilon(self, dst):
         """
         Calculates epsilon_bar and epsilon_hat, the integrals of the PSP kernel from a target

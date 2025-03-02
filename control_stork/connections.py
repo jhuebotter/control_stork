@@ -119,16 +119,16 @@ class Connection(BaseConnection):
 
     def get_weights(self) -> torch.Tensor:
         return self.op.weight
-    
+
     def get_bias(self) -> torch.Tensor:
         return self.op.bias
-    
+
     def get_weight_regularizer_loss(self, reduction="mean") -> torch.Tensor:
         reg_loss = torch.tensor(0.0, device=self.device)
         for reg in self.regularizers:
             reg_loss = reg_loss + reg(self.get_weights(), reduction=reduction)
         return reg_loss
-    
+
     def get_bias_regularizer_loss(self, reduction="mean") -> torch.Tensor:
         reg_loss = torch.tensor(0.0, device=self.device)
         bias = self.get_bias()
@@ -136,13 +136,13 @@ class Connection(BaseConnection):
             for reg in self.regularizers:
                 reg_loss = reg_loss + reg(bias, reduction=reduction)
         return reg_loss
-    
+
     def get_weight_regularizer_grad(self) -> torch.Tensor:
         reg_grad = torch.tensor(0.0, device=self.device)
         for reg in self.regularizers:
             reg_grad = reg_grad + reg.grad(self.get_weights())
         return reg_grad
-    
+
     def get_bias_regularizer_grad(self) -> torch.Tensor:
         reg_grad = torch.tensor(0.0, device=self.device)
         bias = self.get_bias()
@@ -181,6 +181,13 @@ class Connection(BaseConnection):
 
 
 class BottleneckLinearConnection(BaseConnection):
+    """
+    BottleneckLinearConnection replaces a large fully connected weight matrix with two sequential
+    linear layers: a "pre_op" layer (W1) projecting from the source dimension (n) to a smaller latent
+    space of dimension d (n_dims), followed by an "op" layer (W2) projecting from d to the destination dimension.
+
+    """
+
     def __init__(
         self,
         src,  #: nodes.CellGroup,
@@ -211,20 +218,22 @@ class BottleneckLinearConnection(BaseConnection):
         self.flatten_input = flatten_input
         self.n_dims = n_dims
 
-        # TODO: ideally combine pre_op and op into one layer
+        # Determine input dimension, n, from the source:
+        n = src.nb_units if flatten_input else src.shape[0]
 
-        self.pre_op = nn.Linear(
-            src.nb_units if flatten_input else src.shape[0],
-            self.n_dims,
-            bias=latent_bias,
-            **kwargs
-        )
+        self.pre_op = nn.Linear(n, self.n_dims, bias=latent_bias, **kwargs)
         self.op = nn.Linear(self.n_dims, dst.shape[0], bias=bias, **kwargs)
 
         for param in self.pre_op.parameters():
             param.requires_grad = requires_grad
         for param in self.op.parameters():
             param.requires_grad = requires_grad
+
+        # gain_pre = math.sqrt(self.n_dims / n)
+        gain_pre = 1
+        torch.nn.init.orthogonal_(self.pre_op.weight, gain=gain_pre)
+        # The op layer (W2) is initialized later using your existing initializer.
+        # ---------------------------------------------------
 
     def add_diagonal_structure(self, width: float = 1.0, ampl: float = 1.0) -> None:
         if type(self.op) != nn.Linear:
@@ -237,7 +246,7 @@ class BottleneckLinearConnection(BaseConnection):
 
     def get_weights(self) -> (torch.Tensor, torch.Tensor):
         return self.pre_op.weight, self.op.weight
-    
+
     def get_bias(self) -> (torch.Tensor, torch.Tensor):
         return self.pre_op.bias, self.op.bias
 

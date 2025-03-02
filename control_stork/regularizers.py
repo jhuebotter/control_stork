@@ -36,8 +36,6 @@ class ActivityRegularizer:
                 f"Regularizer basis {self.basis} not stored in group {group.name}."
             )
         act = group.get_state_sequence(self.basis)  # get sequence used for regularization
-        # act = group.get_out_sequence()  # get output
-        # cnt = torch.sum(act, dim=1)  # get spikecount
         avg = torch.mean(act, dim=1)  # get average "spike density"
 
         # if population-level regularizer, calculate mean across defined dims
