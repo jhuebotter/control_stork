@@ -327,7 +327,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
     def __init__(
         self,
         mu_u,
-        xi,
+        sigma_u,
         nu,
         time_step,
         epsilon_calc_mode="numerical",
@@ -341,7 +341,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
         )
 
         self.mu_u = mu_u
-        self.xi = xi
+        self.xi = 1 / sigma_u
         self.nu = nu
         self.time_step = time_step
         self.epsilon_calc_mode = epsilon_calc_mode
@@ -504,7 +504,7 @@ class FluctuationDrivenCenteredNormalInitializer(FluctuationDrivenNormalInitiali
     ):
         super().__init__(
             mu_u=0.0,
-            xi=1 / sigma_u,
+            sigma_u=sigma_u,
             nu=nu,
             time_step=time_step,
             epsilon_calc_mode=epsilon_calc_mode,
@@ -519,7 +519,7 @@ class FluctuationDrivenExponentialInitializer(FluctuationDrivenNormalInitializer
     ):
         super().__init__(
             mu_u=0.0,  # Fixed to balanced state
-            xi=1 / sigma_u,
+            sigma_u=sigma_u,
             nu=nu,
             time_step=time_step,
             epsilon_calc_mode=epsilon_calc_mode,
@@ -694,7 +694,7 @@ class SpikeInitLogNormalInitializer(FluctuationDrivenNormalInitializer):
     ):
         super().__init__(
             mu_u=0.0,  # Fixed to balanced state
-            xi=1 / sigma_u,
+            sigma_u=sigma_u,
             nu=nu,
             time_step=time_step,
             epsilon_calc_mode=epsilon_calc_mode,
