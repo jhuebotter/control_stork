@@ -107,15 +107,68 @@ class Connection(BaseConnection):
             self.op = operation(src.shape[0], dst.shape[0], bias=bias, **kwargs)
         for param in self.op.parameters():
             param.requires_grad = requires_grad
-
+            
     def add_diagonal_structure(self, width: float = 1.0, ampl: float = 1.0) -> None:
+        """
+        Add a diagonal Gaussian structure to the weight matrix of a linear layer,
+        then rescale the resulting weights so that the overall (Frobenius) norm matches 
+        that of the original weight matrix.
+        
+        For a weight matrix W of shape (m, n), this function creates a matrix A defined by:
+        
+            A[i, j] = ampl * exp(-((x[j] - i)^2) / width^2)
+            
+        where x is linearly spaced between 0 and m (with n points).
+        
+        The new weights are computed as:
+        
+            W_new = W + A
+            
+        Then we compute the scaling factor:
+        
+            c = ||W||_F / ||W_new||_F
+            
+        and update the weights as:
+        
+            W_final = c * W_new
+            
+        so that the overall magnitude of the weight matrix is preserved.
+        """
         if type(self.op) != nn.Linear:
             raise ValueError("Expected op to be nn.Linear to add diagonal structure.")
+        
+        # Save the original weight matrix.
+        W_orig = self.op.weight.data.clone()
+        
+        # Create the diagonal boost A.
         A = np.zeros(self.op.weight.shape)
-        x = np.linspace(0, A.shape[0], A.shape[1])
-        for i in range(len(A)):
-            A[i] = ampl * np.exp(-((x - i) ** 2) / width**2)
-        self.op.weight.data += torch.from_numpy(A)
+        m, n = self.op.weight.shape
+        # Generate n linearly spaced values between 0 and m.
+        x = np.linspace(0, m, n)
+        for i in range(m):
+            A[i] = ampl * np.exp(-((x - i) ** 2) / (width**2))
+        
+        # Convert A to a torch tensor matching the device and dtype of the weights.
+        A_tensor = torch.from_numpy(A).to(self.op.weight.data.device).type(self.op.weight.data.dtype)
+        
+        # Add the diagonal structure.
+        W_new = W_orig + A_tensor
+
+        # Compute Frobenius norms.
+        orig_norm = torch.norm(W_orig, p='fro')
+        new_norm = torch.norm(W_new, p='fro')
+        
+        # Compute scaling factor to preserve the original norm.
+        if new_norm > 0:
+            scaling_factor = orig_norm / new_norm
+        else:
+            scaling_factor = 1.0
+
+        # Scale the new weight matrix.
+        W_final = scaling_factor * W_new
+        
+        # Update the weight matrix.
+        self.op.weight.data.copy_(W_final)
 
     def get_weights(self) -> torch.Tensor:
         return self.op.weight
