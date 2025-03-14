@@ -120,8 +120,8 @@ class DirectReadoutGroup(CellGroup):
         self.apply_tanh = apply_tanh  # Whether to use tanh activation
 
         # Convert initial scaling values to log-space
-        log_weight_scale = torch.log(torch.tensor(weight_scale, dtype=torch.float32))
-        log_out_scale = torch.log(torch.tensor(output_scale, dtype=torch.float32))
+        log_weight_scale = torch.log(torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32))
+        log_out_scale = torch.log(torch.tensor([output_scale] * self.nb_units, dtype=torch.float32))
 
         # Separate learning options for weight and output scaling
         if learn_weight_scale:
@@ -192,8 +192,8 @@ class TimeAverageReadoutGroup(CellGroup):
         self.steps = steps
 
         # Convert initial scaling values to log-space
-        log_weight_scale = torch.log(torch.tensor(weight_scale, dtype=torch.float32))
-        log_out_scale = torch.log(torch.tensor(output_scale, dtype=torch.float32))
+        log_weight_scale = torch.log(torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32))
+        log_out_scale = torch.log(torch.tensor([output_scale] * self.nb_units, dtype=torch.float32))
 
         # Separate learning options for weight and output scaling
         if learn_weight_scale:

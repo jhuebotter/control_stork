@@ -16,7 +16,7 @@ class InputGroup(CellGroup):
         **kwargs
     ) -> None:
         super(InputGroup, self).__init__(shape, name=name, **kwargs)
-        log_scaling = torch.log(torch.tensor(scaling, dtype=torch.float32))
+        log_scaling = torch.log(torch.tensor([scaling] * self.nb_units, dtype=torch.float32))
         if learn_scaling:
             self.log_scaling = torch.nn.Parameter(
                 torch.tensor(log_scaling, dtype=torch.float32)
