@@ -14,7 +14,11 @@ class ReadoutGroup(CellGroup):
         tau_mem: Union[float, torch.Tensor] = 10e-3,
         tau_syn: Union[float, torch.Tensor] = 5e-3,
         weight_scale: float = 1.0,
+        output_scale: float = 1.0,
+        apply_tanh: bool = False,
         initial_state: float = -1e-3,
+        learn_weight_scale: bool = False,
+        learn_output_scale: bool = False,
         stateful: bool = False,  # ? what is this good for? Why is it not True?
         name: Optional[str] = None,
         store_sequences: Optional[Iterable] = ["out"],
@@ -31,9 +35,42 @@ class ReadoutGroup(CellGroup):
         self.tau_syn = tau_syn
         self.store_output_seq = True
         self.initial_state = initial_state  # ? why is this not 0?
-        self.weight_scale = weight_scale  # ? what is this good for?
         self.out = None
         self.syn = None
+        self.apply_tanh = apply_tanh  # Whether to use tanh activation
+        self.learn_weight_scale = learn_weight_scale
+        self.learn_output_scale = learn_output_scale
+
+        ### DEBUG ###
+        print(self.apply_tanh)
+
+        if not self.apply_tanh and self.learn_output_scale:
+            raise ValueError(
+                "Output scaling is only used when applying tanh activation"
+            )
+
+        self.set_scaling(weight_scale, output_scale)
+
+    def set_scaling(
+        self,
+        weight_scale: float = 1.0,
+        output_scale: float = 1.0,
+    ) -> None:
+
+        # Convert initial scaling values to log-space
+        weight_scale = torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32)
+        output_scale = torch.tensor([output_scale] * self.nb_units, dtype=torch.float32)
+
+        # Separate learning options for weight and output scaling
+        if self.learn_weight_scale:
+            self.log_weight_scale_ = torch.nn.Parameter(torch.log(weight_scale))
+        else:
+            self.register_buffer("weight_scale_", weight_scale)
+
+        if self.learn_output_scale and self.apply_tanh:
+            self.log_out_scale_ = torch.nn.Parameter(torch.log(output_scale))
+        else:
+            self.register_buffer("output_scale_", output_scale)
 
     def configure(self, time_step, device, dtype) -> None:
         super().configure(time_step, device, dtype)
@@ -42,7 +79,9 @@ class ReadoutGroup(CellGroup):
         self.dcy_mem = float(torch.exp(-time_step / torch.tensor(self.tau_mem)))
         self.scl_mem = 1.0 - self.dcy_mem
         self.dcy_syn = float(torch.exp(-time_step / torch.tensor(self.tau_syn)))
-        self.scl_syn = (1.0 - self.dcy_syn) * self.weight_scale
+        self.scl_syn = (
+            1.0 - self.dcy_syn
+        ) * self.weight_scale  # this seems to be currently unused and could be removed
 
     def reset_state(self, batch_size: int = 1) -> None:
         super().reset_state(batch_size)
@@ -51,11 +90,29 @@ class ReadoutGroup(CellGroup):
 
     def forward(self) -> None:
         # synaptic & membrane dynamics
-        new_syn = self.dcy_syn * self.syn + self.input
+        new_syn = self.dcy_syn * self.syn + self.input * self.weight_scale
         new_mem = self.dcy_mem * self.out + self.scl_mem * self.syn
 
-        self.out = self.states["out"] = self.mem = self.states["mem"] = new_mem
+        self.mem = self.states["mem"] = new_mem
+        if self.apply_tanh:
+            self.out = self.states["out"] = torch.tanh(new_mem) * self.output_scale
+        else:
+            self.out = self.states["out"] = self.mem
         self.syn = self.states["syn"] = new_syn
+
+    @property
+    def output_scale(self) -> torch.Tensor:
+        """Returns the learned or fixed output scaling"""
+        if self.learn_output_scale:
+            return torch.exp(self.log_out_scale_)
+        return self.output_scale_
+
+    @property
+    def weight_scale(self) -> torch.Tensor:
+        """Returns the learned or fixed weight scaling"""
+        if self.learn_weight_scale:
+            return torch.exp(self.log_weight_scale_)
+        return self.weight_scale_
 
 
 class FastReadoutGroup(ReadoutGroup):
@@ -65,7 +122,11 @@ class FastReadoutGroup(ReadoutGroup):
         tau_mem: Union[float, torch.Tensor] = 10e-3,
         tau_syn: Union[float, torch.Tensor] = 5e-3,
         weight_scale: float = 1.0,
+        output_scale: float = 1.0,
+        apply_tanh: bool = False,
         initial_state: float = -1e-3,
+        learn_weight_scale: bool = False,
+        learn_output_scale: bool = False,
         stateful: bool = False,  # ? what is this good for? Why is it not True?
         name: Optional[str] = None,
         store_sequences: Optional[Iterable] = ["out"],
@@ -76,7 +137,11 @@ class FastReadoutGroup(ReadoutGroup):
             tau_mem,
             tau_syn,
             weight_scale,
+            output_scale,
+            apply_tanh,
             initial_state,
+            learn_weight_scale,
+            learn_output_scale,
             stateful,
             name="Fast Readout" if name is None else name,
             store_sequences=store_sequences,
@@ -85,10 +150,13 @@ class FastReadoutGroup(ReadoutGroup):
 
     def forward(self) -> None:
         # synaptic & membrane dynamics
-        new_syn = self.dcy_syn * self.syn + self.input
+        new_syn = self.dcy_syn * self.syn + self.input * self.weight_scale
         new_mem = self.dcy_mem * self.out + self.scl_mem * new_syn
-
-        self.out = self.states["out"] = self.mem = self.states["mem"] = new_mem
+        self.mem = self.states["mem"] = new_mem
+        if self.apply_tanh:
+            self.out = self.states["out"] = torch.tanh(new_mem) * self.output_scale
+        else:
+            self.out = self.states["out"] = new_mem
         self.syn = self.states["syn"] = new_syn
 
 
@@ -120,8 +188,12 @@ class DirectReadoutGroup(CellGroup):
         self.apply_tanh = apply_tanh  # Whether to use tanh activation
 
         # Convert initial scaling values to log-space
-        log_weight_scale = torch.log(torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32))
-        log_out_scale = torch.log(torch.tensor([output_scale] * self.nb_units, dtype=torch.float32))
+        log_weight_scale = torch.log(
+            torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32)
+        )
+        log_out_scale = torch.log(
+            torch.tensor([output_scale] * self.nb_units, dtype=torch.float32)
+        )
 
         # Separate learning options for weight and output scaling
         if learn_weight_scale:
@@ -192,8 +264,12 @@ class TimeAverageReadoutGroup(CellGroup):
         self.steps = steps
 
         # Convert initial scaling values to log-space
-        log_weight_scale = torch.log(torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32))
-        log_out_scale = torch.log(torch.tensor([output_scale] * self.nb_units, dtype=torch.float32))
+        log_weight_scale = torch.log(
+            torch.tensor([weight_scale] * self.nb_units, dtype=torch.float32)
+        )
+        log_out_scale = torch.log(
+            torch.tensor([output_scale] * self.nb_units, dtype=torch.float32)
+        )
 
         # Separate learning options for weight and output scaling
         if learn_weight_scale:

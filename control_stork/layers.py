@@ -113,8 +113,15 @@ class Layer(AbstractLayer):
     ) -> None:
         super().__init__(name, model, recurrent)
 
+        if regs:
+            if "regularizers" in neuron_kwargs:
+                print(
+                    "Warning: regularizers in neuron_kwargs will be overwritten by regs"
+                )
+            neuron_kwargs["regularizers"] = regs
+
         # Make neuron group
-        nodes = neuron_class(size, name=self.name, regularizers=regs, **neuron_kwargs)
+        nodes = neuron_class(size, name=self.name, **neuron_kwargs)
         self.add_neurons(nodes)
 
         # Make afferent connection

@@ -11,20 +11,20 @@ class InputGroup(CellGroup):
         self,
         shape: Union[int, Iterable],
         name: str = "Input",
-        scaling: float = 1.0,
-        learn_scaling: bool = False,
+        input_scale: float = 1.0,
+        learn_input_scale: bool = False,
         **kwargs
     ) -> None:
         super(InputGroup, self).__init__(shape, name=name, **kwargs)
-        log_scaling = torch.log(torch.tensor([scaling] * self.nb_units, dtype=torch.float32))
-        if learn_scaling:
-            self.log_scaling = torch.nn.Parameter(
-                torch.tensor(log_scaling, dtype=torch.float32)
-            )
+        self.learn_input_scale = learn_input_scale
+        self.set_scaling(input_scale)
+
+    def set_scaling(self, input_scale: float = 1.0) -> None:
+        input_scale = torch.tensor([input_scale] * self.nb_units, dtype=torch.float32)
+        if self.learn_input_scale:
+            self.log_input_scale_ = torch.nn.Parameter(torch.log(input_scale))
         else:
-            self.register_buffer(
-                "log_scaling", torch.tensor(log_scaling, dtype=torch.float32)
-            )
+            self.register_buffer("input_scale_", input_scale)
 
     def reset_state(self, batch_size: Optional[int] = 1) -> None:
         super().reset_state(batch_size)
@@ -38,10 +38,15 @@ class InputGroup(CellGroup):
 
     def forward(self) -> None:
 
-        self.out = self.states["out"] = self.local_data[:, self.counter] * self.scaling
+        self.out = self.states["out"] = (
+            self.local_data[:, self.counter] * self.input_scale
+        )
         self.counter += 1
 
     # define a property for scaling
     @property
-    def scaling(self) -> torch.Tensor:
-        return torch.exp(self.log_scaling)
+    def input_scale(self) -> torch.Tensor:
+        if self.learn_input_scale:
+            return torch.exp(self.log_input_scale_)
+        else:
+            return self.input_scale_
