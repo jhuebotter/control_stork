@@ -52,9 +52,18 @@ class AdaptiveLIFGroup(CellGroup):
         self.syn_param = syn_param.lower()
         self.ada_param = ada_param.lower()
 
-        assert self.mem_param in ["full", "single"], "mem_param must be 'full' or 'single'"
-        assert self.syn_param in ["full", "single"], "syn_param must be 'full' or 'single'"
-        assert self.ada_param in ["full", "single"], "ada_param must be 'full' or 'single'"
+        assert self.mem_param in [
+            "full",
+            "single",
+        ], "mem_param must be 'full' or 'single'"
+        assert self.syn_param in [
+            "full",
+            "single",
+        ], "syn_param must be 'full' or 'single'"
+        assert self.ada_param in [
+            "full",
+            "single",
+        ], "ada_param must be 'full' or 'single'"
 
         # Define shapes for learnable parameters
         mem_shape = self.shape if self.mem_param == "full" else (1,)
@@ -63,25 +72,52 @@ class AdaptiveLIFGroup(CellGroup):
 
         # Learnable or fixed tau parameters
         if learn_mem:
-            self.log_tau_mem = torch.nn.Parameter(log_tau_mem_init.expand(mem_shape).clone())
+            self.log_tau_mem = torch.nn.Parameter(
+                log_tau_mem_init.expand(mem_shape).clone()
+            )
         else:
-            self.register_buffer("log_tau_mem", log_tau_mem_init.expand(mem_shape).clone())
+            self.register_buffer(
+                "log_tau_mem", log_tau_mem_init.expand(mem_shape).clone()
+            )
 
         if learn_syn:
-            self.log_tau_syn = torch.nn.Parameter(log_tau_syn_init.expand(syn_shape).clone())
+            self.log_tau_syn = torch.nn.Parameter(
+                log_tau_syn_init.expand(syn_shape).clone()
+            )
         else:
-            self.register_buffer("log_tau_syn", log_tau_syn_init.expand(syn_shape).clone())
+            self.register_buffer(
+                "log_tau_syn", log_tau_syn_init.expand(syn_shape).clone()
+            )
 
         if learn_ada:
-            self.log_tau_ada = torch.nn.Parameter(log_tau_ada_init.expand(ada_shape).clone())
+            self.log_tau_ada = torch.nn.Parameter(
+                log_tau_ada_init.expand(ada_shape).clone()
+            )
         else:
-            self.register_buffer("log_tau_ada", log_tau_ada_init.expand(ada_shape).clone())
-        self.apply_constraints()  # Ensure tau values are in valid range
-        self.update_tau_and_beta()
+            self.register_buffer(
+                "log_tau_ada", log_tau_ada_init.expand(ada_shape).clone()
+            )
+
+        # Initialize other parameters
+        self.dt = None  # Time step for discrete updates
+        self.device = None  # Device for tensor operations
+        self.dtype = None  # Data type for tensors
+
+        self.tau_mem = None  # Membrane time constant
+        self.tau_syn = None
+        self.tau_ada = None  # Adaptation time constant
+
+        self.beta_mem = None  # Discrete update factor for membrane potential
+        self.beta_syn = None
+        self.beta_ada = None  # Discrete update factor for adaptation
 
         self.threshold = threshold
-        self.register_buffer("threshold_decay", torch.tensor(threshold_decay, dtype=torch.float32))
-        self.register_buffer("threshold_xi", torch.tensor(threshold_xi, dtype=torch.float32))
+        self.register_buffer(
+            "threshold_decay", torch.tensor(threshold_decay, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "threshold_xi", torch.tensor(threshold_xi, dtype=torch.float32)
+        )
 
         assert self.threshold_decay >= 0.0, "threshold_decay must be non-negative"
         assert self.threshold_xi >= 0.0, "threshold_xi must be non-negative"
@@ -89,7 +125,9 @@ class AdaptiveLIFGroup(CellGroup):
         # Reset type
         if reset not in ["sub", "set"]:
             raise ValueError("reset must be either 'sub' or 'set'")
-        self.reset_mem = self.subtractive_reset if reset == "sub" else self.multiplicative_reset
+        self.reset_mem = (
+            self.subtractive_reset if reset == "sub" else self.multiplicative_reset
+        )
         self.diff_reset = diff_reset
 
         # Spiking activation
@@ -111,11 +149,14 @@ class AdaptiveLIFGroup(CellGroup):
         self.device = device
         self.dtype = dtype
 
+        self.apply_constraints()  # Ensure tau values are in valid range
+        self.update_tau_and_beta()  # Update tau and beta values
+
         self.to(device)  # Ensure all parameters are on the correct device
 
     def apply_constraints(self):
         """Clamp tau values to prevent extreme instability."""
-        max_log_tau = 2.0   # maximum allowed value for log_tau
+        max_log_tau = 2.0  # maximum allowed value for log_tau
         min_log_tau = -7.0  # minimum allowed value for log_tau
 
         with torch.no_grad():
@@ -134,7 +175,7 @@ class AdaptiveLIFGroup(CellGroup):
         self.beta_mem = self.tau_to_beta(self.tau_mem)
         self.beta_syn = self.tau_to_beta(self.tau_syn)
         self.beta_ada = self.tau_to_beta(self.tau_ada)
-                
+
     def tau_to_beta(self, tau: torch.Tensor) -> torch.Tensor:
         """Convert tau to beta for discrete updates"""
         return torch.exp(-self.dt / tau)
@@ -147,7 +188,9 @@ class AdaptiveLIFGroup(CellGroup):
         """Multiplicative membrane reset"""
         return mem * (1.0 - rst)
 
-    def get_spike_and_reset(self, mem: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_spike_and_reset(
+        self, mem: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Compute spike output and reset signal"""
         mthr = mem - self.vt
         out = self.spk_nl(mthr)
@@ -179,13 +222,19 @@ class AdaptiveLIFGroup(CellGroup):
     def forward(self) -> None:
         """Forward pass of the adaptive LIF neuron"""
         self.syn = self.states["syn"] = self.syn * self.beta_syn + self.input
-        self.mem = self.states["mem"] = (
-            self.mem * self.beta_mem + self.syn * (1.0 - self.beta_mem)
+        self.mem = self.states["mem"] = self.mem * self.beta_mem + self.syn * (
+            1.0 - self.beta_mem
         )
         self.out, self.rst = self.get_spike_and_reset(self.mem)
         self.mem = self.states["mem"] = self.reset_mem(self.mem, self.rst)
         self.states["out"] = self.out
 
-        self.bt = self.states["bt"] = self.bt - self.threshold_decay * self.dt + (self.threshold - self.bt) * self.rst
-        self.nt = self.states["nt"] = self.nt * self.beta_ada + (1.0 - self.beta_ada) * self.rst
+        self.bt = self.states["bt"] = (
+            self.bt
+            - self.threshold_decay * self.dt
+            + (self.threshold - self.bt) * self.rst
+        )
+        self.nt = self.states["nt"] = (
+            self.nt * self.beta_ada + (1.0 - self.beta_ada) * self.rst
+        )
         self.vt = self.states["vt"] = self.bt + self.threshold_xi * self.nt
