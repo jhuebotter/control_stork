@@ -76,6 +76,8 @@ class AdaptiveLIFGroup(CellGroup):
             self.log_tau_ada = torch.nn.Parameter(log_tau_ada_init.expand(ada_shape).clone())
         else:
             self.register_buffer("log_tau_ada", log_tau_ada_init.expand(ada_shape).clone())
+        self.apply_constraints()  # Ensure tau values are in valid range
+        self.update_tau_and_beta()
 
         self.threshold = threshold
         self.register_buffer("threshold_decay", torch.tensor(threshold_decay, dtype=torch.float32))
@@ -112,17 +114,27 @@ class AdaptiveLIFGroup(CellGroup):
         self.to(device)  # Ensure all parameters are on the correct device
 
     def apply_constraints(self):
-        """Clamp tau values to prevent extreme instability"""
-        max_log_tau = 3.0  # Ensuring tau remains in a reasonable range
-        min_log_tau = -7.0  # Prevent too small tau values
+        """Clamp tau values to prevent extreme instability."""
+        max_log_tau = 2.0   # maximum allowed value for log_tau
+        min_log_tau = -7.0  # minimum allowed value for log_tau
 
-        if isinstance(self.log_tau_mem, torch.nn.Parameter):
-            self.log_tau_mem.data = torch.clamp(self.log_tau_mem.data, min=min_log_tau, max=max_log_tau)
-        if isinstance(self.log_tau_syn, torch.nn.Parameter):
-            self.log_tau_syn.data = torch.clamp(self.log_tau_syn.data, min=min_log_tau, max=max_log_tau)
-        if isinstance(self.log_tau_ada, torch.nn.Parameter):
-            self.log_tau_ada.data = torch.clamp(self.log_tau_ada.data, min=min_log_tau, max=max_log_tau)
+        with torch.no_grad():
+            if isinstance(self.log_tau_mem, torch.nn.Parameter):
+                self.log_tau_mem.clamp_(min=min_log_tau, max=max_log_tau)
+            if isinstance(self.log_tau_syn, torch.nn.Parameter):
+                self.log_tau_syn.clamp_(min=min_log_tau, max=max_log_tau)
+            if isinstance(self.log_tau_ada, torch.nn.Parameter):
+                self.log_tau_ada.clamp_(min=min_log_tau, max=max_log_tau)
 
+    def update_tau_and_beta(self):
+        """Update tau and beta values based on the current log_tau parameters."""
+        self.tau_syn = torch.exp(self.log_tau_syn)
+        self.tau_mem = torch.exp(self.log_tau_mem)
+        self.tau_ada = torch.exp(self.log_tau_ada)
+        self.beta_mem = self.tau_to_beta(self.tau_mem)
+        self.beta_syn = self.tau_to_beta(self.tau_syn)
+        self.beta_ada = self.tau_to_beta(self.tau_ada)
+                
     def tau_to_beta(self, tau: torch.Tensor) -> torch.Tensor:
         """Convert tau to beta for discrete updates"""
         return torch.exp(-self.dt / tau)
@@ -146,6 +158,7 @@ class AdaptiveLIFGroup(CellGroup):
         """Reset the internal state of the neuron group"""
         super().reset_state(batch_size)
         self.apply_constraints()  # Ensure tau values are in valid range
+        self.update_tau_and_beta()
 
         self.mem = self.get_state_tensor("mem", state=self.mem)
         self.syn = self.get_state_tensor("syn", state=self.syn)
@@ -176,27 +189,3 @@ class AdaptiveLIFGroup(CellGroup):
         self.bt = self.states["bt"] = self.bt - self.threshold_decay * self.dt + (self.threshold - self.bt) * self.rst
         self.nt = self.states["nt"] = self.nt * self.beta_ada + (1.0 - self.beta_ada) * self.rst
         self.vt = self.states["vt"] = self.bt + self.threshold_xi * self.nt
-
-    @property
-    def tau_mem(self):
-        return torch.exp(self.log_tau_mem)
-
-    @property
-    def tau_syn(self):
-        return torch.exp(self.log_tau_syn)
-
-    @property
-    def tau_ada(self):
-        return torch.exp(self.log_tau_ada)
-
-    @property
-    def beta_mem(self):
-        return self.tau_to_beta(self.tau_mem)
-
-    @property
-    def beta_syn(self):
-        return self.tau_to_beta(self.tau_syn)
-
-    @property
-    def beta_ada(self):
-        return self.tau_to_beta(self.tau_ada)

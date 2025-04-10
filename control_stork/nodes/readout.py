@@ -41,9 +41,6 @@ class ReadoutGroup(CellGroup):
         self.learn_weight_scale = learn_weight_scale
         self.learn_output_scale = learn_output_scale
 
-        ### DEBUG ###
-        print(self.apply_tanh)
-
         if not self.apply_tanh and self.learn_output_scale:
             raise ValueError(
                 "Output scaling is only used when applying tanh activation"
