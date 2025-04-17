@@ -35,7 +35,7 @@ def plot_spikes(
         n_cols = min(math.ceil(n_examples / n_rows), dim[1])
     dim = (n_rows, n_cols)
 
-    fig = plt.figure(figsize=(10, 4))
+    fig = plt.figure(figsize=(n_cols * 2, n_rows * 1.5))
     gs = plt.GridSpec(n_rows, n_cols, figure=fig)
     if title:
         fig.suptitle(title)
@@ -56,6 +56,8 @@ def plot_spikes(
         else:
             ax.xaxis.set_tick_params(labelbottom=False)
             ax.yaxis.set_tick_params(labelleft=False)
+    
+    plt.tight_layout()
     if savefig:
         plt.savefig(savefig)
     if show:
@@ -70,7 +72,7 @@ def plot_traces(
     spk: Optional[torch.Tensor] = None,
     dim: tuple = (3, 5),
     spike_height: float = 10,
-    ylabel: str = "V(t)",
+    ylabel: str = "U(t)",
     title: str = "",
     savefig: str = "",
     show: bool = False,
@@ -102,7 +104,7 @@ def plot_traces(
         n_cols = min(math.ceil(n_examples / n_rows), dim[1])
     dim = (n_rows, n_cols)
 
-    fig = plt.figure(figsize=(10, 4))
+    fig = plt.figure(figsize=(n_cols * 2, n_rows * 1.5))
     if title:
         fig.suptitle(title)
     gs = plt.GridSpec(*dim, figure=fig)
@@ -127,6 +129,8 @@ def plot_traces(
             ax.spines[["right", "top"]].set_visible(False)
             ax.set_ylabel(ylabel)
             ax.set_xlabel("Time Step")
+
+    plt.tight_layout()
     if savefig:
         plt.savefig(savefig)
     if show:
