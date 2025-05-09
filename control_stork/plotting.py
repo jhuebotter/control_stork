@@ -2,6 +2,7 @@ import torch
 import math
 import matplotlib.pyplot as plt
 from .extratypes import *
+import numpy as np
 
 
 def plot_spikes(
@@ -56,7 +57,7 @@ def plot_spikes(
         else:
             ax.xaxis.set_tick_params(labelbottom=False)
             ax.yaxis.set_tick_params(labelleft=False)
-    
+
     plt.tight_layout()
     if savefig:
         plt.savefig(savefig)
@@ -135,6 +136,85 @@ def plot_traces(
         plt.savefig(savefig)
     if show:
         plt.show()
+    if retrn:
+        return fig
+    plt.close()
+
+
+def plot_histogram(
+    data: torch.Tensor,
+    bins: int = 20,
+    title: str = "",
+    xlabel: str = "Value",
+    ylabel: str = "Count",
+    color: Optional[str] = None,
+    savefig: str = "",
+    show: bool = False,
+    retrn: bool = True,
+    xlim_min: Optional[float] = None,
+    xlim_max: Optional[float] = None,
+) -> plt.Figure:
+    """
+    Plot a histogram of the values in a 1D tensor, with optional x-axis limits and minimal styling.
+
+    Args:
+        data (torch.Tensor): 1D tensor of values to plot.
+        bins (int): Number of histogram bins.
+        title (str): Title of the plot.
+        xlabel (str): Label for the x-axis.
+        ylabel (str): Label for the y-axis.
+        color (Optional[str]): Matplotlib color spec for the bars.
+        savefig (str): Path to save the figure (if non-empty).
+        show (bool): Whether to call plt.show().
+        retrn (bool): Whether to return the Figure. If False, the figure is closed after creation.
+        xlim_min (Optional[float]): Lower x-axis limit. If None, set to 90% of min(data).
+        xlim_max (Optional[float]): Upper x-axis limit. If None, set to 110% of max(data).
+
+    Returns:
+        matplotlib.figure.Figure: The matplotlib Figure object containing the histogram.
+    """
+    # prepare data array
+    arr = data.detach().cpu().numpy().flatten()
+    # compute data range and axis limits
+    data_min, data_max = arr.min(), arr.max()
+    axis_lower = data_min * 0.9 if xlim_min is None else xlim_min
+    axis_upper = data_max * 1.1 if xlim_max is None else xlim_max
+
+    # figure with smaller default size
+    fig, ax = plt.subplots(figsize=(3, 2))
+    # determine if single-value
+    unique_vals = np.unique(arr)
+    if unique_vals.size == 1:
+        # single-value case: bar spanning narrower [95%,105%] around the value
+        v = unique_vals[0]
+        bar_lower = v * 0.95
+        bar_upper = v * 1.05
+        ax.hist(arr, bins=[bar_lower, bar_upper], color=color, alpha=0.7)
+    else:
+        # multi-value case: histogram over padded axis limits
+        ax.hist(arr, bins=bins, range=(axis_lower, axis_upper), color=color, alpha=0.7)
+
+    # plot mean line
+    mean_val = arr.mean()
+    ax.axvline(mean_val, color="k", linestyle="--", linewidth=1)
+
+    # axis labels and title
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    # apply axis limits
+    ax.set_xlim(axis_lower, axis_upper)
+    # remove top and right spines for cleaner look
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    # save or show
+    plt.tight_layout()
+    if savefig:
+        fig.savefig(savefig)
+    if show:
+        plt.show()
+    # return or close
     if retrn:
         return fig
     plt.close()

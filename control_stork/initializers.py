@@ -9,6 +9,7 @@ import numpy as np
 
 from . import connections
 from . import layers
+from . import nodes
 from .extratypes import *
 
 from .utils import get_lif_kernel
@@ -214,7 +215,7 @@ class KaimingNormalInitializer(Initializer):
     def __init__(self, gain=1.0, **kwargs):
         super().__init__(
             scaling=None,  # Fixed to None, as scaling is implemented in the weight sampling
-            **kwargs
+            **kwargs,
         )
 
         self.gain = gain
@@ -332,7 +333,7 @@ class FluctuationDrivenNormalInitializer(Initializer):
         time_step,
         epsilon_calc_mode="numerical",
         alpha=0.9,
-        **kwargs
+        **kwargs,
     ):
         # ! commented out the scaling = None as I want to be able to set weights to 0 without changing the initializer.
         super().__init__(
@@ -509,7 +510,7 @@ class FluctuationDrivenCenteredNormalInitializer(FluctuationDrivenNormalInitiali
             time_step=time_step,
             epsilon_calc_mode=epsilon_calc_mode,
             alpha=alpha,
-            **kwargs
+            **kwargs,
         )
 
 
@@ -524,7 +525,7 @@ class FluctuationDrivenExponentialInitializer(FluctuationDrivenNormalInitializer
             time_step=time_step,
             epsilon_calc_mode=epsilon_calc_mode,
             alpha=alpha,
-            **kwargs
+            **kwargs,
         )
 
     def _calc_epsilon(self, dst):
@@ -699,7 +700,7 @@ class SpikeInitLogNormalInitializer(FluctuationDrivenNormalInitializer):
             time_step=time_step,
             epsilon_calc_mode=epsilon_calc_mode,
             alpha=alpha,
-            **kwargs
+            **kwargs,
         )
 
     def _calc_epsilon(self, dst):
@@ -889,3 +890,105 @@ class SpikeInitLogNormalInitializer(FluctuationDrivenNormalInitializer):
                 weights = self._get_weights(connection, mu)
                 # set weights
                 self._set_weights_and_bias(connection, weights)
+
+
+class TauInitializer:
+    """
+    Initialize tau parameters by applying log-normal heterogeneity around scalar defaults.
+
+    Defaults must be provided as floats, and stds as real-space standard deviations.
+    Any key not in stds remains fixed at its default.
+
+    Attributes:
+        defaults (Dict[str,float]): { 'tau_mem': float, 'tau_syn': float, 'tau_ada': float }
+        stds     (Dict[str,float]): { 'tau_mem': std,   'tau_syn': std,   'tau_ada': std }
+    """
+
+    def __init__(self, defaults: Dict[str, float], stds: Dict[str, float]):
+        """
+        Args:
+            defaults: Base tau values for each parameter.
+            stds: Stddev for log-normal jitter around each default. If zero or missing, no jitter.
+        """
+        # Validate keys
+        for key in defaults:
+            assert key.startswith("tau_"), f"Invalid default key {key}."
+        for key in stds:
+            assert key.startswith("tau_"), f"Invalid stds key {key}."
+        self.defaults = defaults
+        self.stds = stds
+
+    def _sample_lognormal(
+        self, shape: Tuple[int, ...], mean: float, std: float
+    ) -> Tensor:
+        """
+        Sample from log-normal with given real-space mean and std.
+
+        Args:
+            shape: Output shape.
+            mean: Desired real-space mean (>0).
+            std: Desired real-space std (>=0).
+        Returns:
+            Tensor of samples with E[X]=mean and SD[X]=std.
+        """
+        # compute log-space parameters
+        sigma2 = math.log(1 + (std / mean) ** 2)
+        sigma = math.sqrt(sigma2)
+        mu = math.log(mean) - sigma2 / 2
+        # sample normal and exponentiate
+        logs = torch.empty(shape).normal_(mu, sigma)
+        return torch.exp(logs)
+
+    def initialize(self, target: str) -> None:
+        if isinstance(target, nodes.CellGroup):
+            self.initialize_group(target)
+
+        elif isinstance(target, layers.AbstractLayer):
+            self.initialize_layer(target)
+
+        else:
+            raise TypeError(
+                "Target object is unsupported. must be Connection or Layer instance."
+            )
+
+    def initialize_layer(self, layer):
+        # Loop through each population in this layer
+        for neurons in layer.neurons:
+            # Initialize tau parameters for each group
+            self.initialize(neurons)
+
+    def initialize_group(self, group: Any) -> None:
+        """
+        Apply initialization to a CellGroup via its _init_tau method.
+        """
+        if not hasattr(group, "_init_tau"):
+            return
+        for name in ("mem", "syn", "ada"):
+            key = f"tau_{name}"
+            # skip if no default provided
+            if key not in self.defaults:
+                continue
+            # skip if group does not have this attribute
+            if not hasattr(group, f"log_tau_{name}"):
+                continue
+            base = self.defaults[key]
+            std = self.stds.get(key, 0.0)
+            # determine mode and shape
+            mode = getattr(group, f"{name}_param", "single")
+            nb = group.nb_units
+            shape = (nb,) if mode == "full" else (1,)
+            # sample or use constant
+            if std > 0:
+                tau_tensor = self._sample_lognormal(shape, base, std)
+            else:
+                tau_tensor = torch.full(shape, base)
+            # detect learnable vs buffer
+            existing = getattr(group, f"log_tau_{name}")
+            learn = isinstance(existing, torch.nn.Parameter)
+            # reinitialize
+            group._init_tau(name, tau_tensor, learn, mode)
+        # reapply constraints and update
+        if hasattr(group, "apply_constraints"):
+            group.apply_constraints()
+        if hasattr(group, "update_tau_and_beta"):
+            group.update_tau_and_beta()

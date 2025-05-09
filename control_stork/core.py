@@ -33,7 +33,7 @@ class NetworkNode(nn.Module):
     ) -> None:
         # removed batch_size and nb_steps
 
-        self.time_step = time_step
+        self.time_step = self.dt = time_step
         self.device = device
         self.dtype = dtype
 

@@ -95,7 +95,7 @@ class RecurrentSpikingModel(nn.Module):
 
     def data_generator(self, dataset, shuffle=True):
         return self.data_generator_(dataset, shuffle=shuffle)
-    
+
     def configure_optimizer(self, optimizer_class, optimizer_kwargs):
         if optimizer_kwargs is not None:
             self.optimizer_instance = optimizer_class(
@@ -148,25 +148,39 @@ class RecurrentSpikingModel(nn.Module):
         for m in self.monitors:
             m.execute()
 
-    def get_monitor_data(self, exclude: Optional[list] = None) -> dict:
-        data = {}
+    def get_monitor_data(
+        self, exclude: Optional[List[str]] = None
+    ) -> Dict[str, Tensor]:
+        """
+        Collect data from all monitors, unpacking per-field dicts into separate entries.
+
+        Returns a dict mapping:
+        "MonitorClass on {group.name} for {key}/{field}" -> Tensor
+        """
+        data: Dict[str, Tensor] = {}
         for m in self.monitors:
-            k = f"{m.__class__.__name__}"
-            if exclude is not None and k in exclude:
+            name = m.__class__.__name__
+            if exclude and name in exclude:
                 continue
-            if hasattr(m, "group"):
-                k += f" on {m.group.name}"
+            base = name
+            if hasattr(m, "group") and hasattr(m.group, "name"):
+                base += f" on {m.group.name}"
             if hasattr(m, "key"):
-                k += f" for {m.key}"
-            data[k] = m.get_data()
+                base += f" for {m.key}"
+            raw = m.get_data()
+            if isinstance(raw, dict):
+                for field, val in raw.items():
+                    data[f"{base}/{field}"] = val
+            else:
+                data[base] = raw
         return data
-    
+
     def compute_activity_regularizer_losses(self, reduction="mean"):
         reg_loss = torch.zeros(1, device=self.device)
         for g in self.groups:
             reg_loss = reg_loss + g.get_regularizer_loss(reduction=reduction)
         return reg_loss
-    
+
     def compute_weight_regularizer_losses(self):
         reg_loss = torch.zeros(1, device=self.device)
         for c in self.connections:
@@ -485,7 +499,7 @@ class RecurrentSpikingModel(nn.Module):
             return results, test_scores, callback_returns
         else:
             return results, test_scores
-    
+
     def count_parameters(self):
         """Returns total number of trainable parameters."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -494,7 +508,7 @@ class RecurrentSpikingModel(nn.Module):
         """Prints a detailed model summary including trainable parameters."""
 
         print("\n# Model Summary")
-        
+
         # Print group details
         print("\n## Groups")
         for group in self.groups:
@@ -508,7 +522,7 @@ class RecurrentSpikingModel(nn.Module):
 
         # Print detailed parameter summary
         print("\n## Trainable Parameters")
-        
+
         # Iterate over named parameters and print only those that require grad
         param_count = 0
         for name, param in self.named_parameters():

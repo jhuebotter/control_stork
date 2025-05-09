@@ -1,7 +1,6 @@
 from .base import CellGroup
 from .readout import (
     ReadoutGroup,
-    FastReadoutGroup,
     DirectReadoutGroup,
     TimeAverageReadoutGroup,
 )
