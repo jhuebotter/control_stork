@@ -200,6 +200,8 @@ class AdaptiveLIFGroup(CellGroup):
             + (self.threshold - self.bt) * self.rst
         )
         self.nt = self.states["nt"] = (
-            self.nt * self.beta_ada + (1.0 - self.beta_ada) * self.rst
+            # self.nt * self.beta_ada + (1.0 - self.beta_ada) * self.rst
+            self.nt * self.beta_ada
+            + self.out
         )
         self.vt = self.states["vt"] = self.bt + self.threshold_xi * self.nt
